@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { axiosInstance } from "../App";
 import { toast } from "sonner";
-import { LogOut, Building2, TrendingUp, DollarSign, FileText, Filter, FileSpreadsheet, Users, User, Menu, X, MoreHorizontal, ChevronDown, Tag, Target, Receipt } from "lucide-react";
+import { LogOut, Building2, TrendingUp, DollarSign, FileText, Filter, FileSpreadsheet, Users, User, Menu, X, MoreHorizontal, ChevronDown, Tag, Target, Receipt, Settings } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +54,8 @@ import RoyaltyPayeeManager from "../components/RoyaltyPayeeManager";
 import RestaurantTargetManager from "../components/RestaurantTargetManager";
 import ExpenseEntry from "../components/ExpenseEntry";
 import PettyCashSummary from "../components/PettyCashSummary";
+import BusinessConfigManager from "../components/BusinessConfigManager";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const DashboardPage = ({ user, onLogout }) => {
   const [restaurants, setRestaurants] = useState([]);
@@ -86,6 +88,8 @@ const DashboardPage = ({ user, onLogout }) => {
     return saved || "date";
   });
   const [selectedBrand, setSelectedBrand] = useState("all");
+
+  const { labels, config } = useBusinessConfig();
 
   // Currency settings
   const [currencySettings, setCurrencySettings] = useState(() => {
@@ -178,8 +182,8 @@ const DashboardPage = ({ user, onLogout }) => {
 
   const handleCurrencyUpdate = (newSettings) => {
     setCurrencySettings(newSettings);
-    // Force re-render of components that use currency display
-    window.location.reload();
+    // Re-fetch data to trigger re-render with new currency settings
+    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy });
   };
 
   const handleRevenueAdded = () => {
@@ -228,7 +232,7 @@ const DashboardPage = ({ user, onLogout }) => {
                 <Building2 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900">Food Court Manager</h1>
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900">{labels.appName}</h1>
                 <p className="text-xs sm:text-sm text-gray-600">
                   Welcome, <span className="font-medium">{user.username}</span>
                   <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
@@ -280,7 +284,7 @@ const DashboardPage = ({ user, onLogout }) => {
           <div className="md:hidden sticky top-[64px] z-40 bg-gradient-to-br from-blue-50 via-white to-green-50 pb-4">
             <div className="bg-white/80 backdrop-blur-sm shadow-sm border border-gray-200 p-3 rounded-lg mt-4">
               <p className="text-sm font-semibold text-gray-900 capitalize">
-                {activeTab === "revenue-categories" ? "Revenue Categories" : activeTab}
+                {activeTab === "revenue-categories" ? `${labels.revenue} Categories` : activeTab}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
                 Tap menu to switch sections
@@ -305,7 +309,7 @@ const DashboardPage = ({ user, onLogout }) => {
               data-testid="revenue-tab"
             >
               <DollarSign className="w-4 h-4" />
-              Add Revenue
+              {`Add ${labels.revenue}`}
             </TabsTrigger>
             <TabsTrigger 
               value="history" 
@@ -313,7 +317,7 @@ const DashboardPage = ({ user, onLogout }) => {
               data-testid="history-tab"
             >
               <FileText className="w-4 h-4" />
-              Revenue History
+              {`${labels.revenue} History`}
             </TabsTrigger>
             <TabsTrigger 
               value="reports" 
@@ -330,7 +334,7 @@ const DashboardPage = ({ user, onLogout }) => {
                 data-testid="restaurants-tab"
               >
                 <Building2 className="w-4 h-4" />
-                Restaurants
+                {labels.entities}
               </TabsTrigger>
             )}
             {user.role === "admin" && (
@@ -348,7 +352,7 @@ const DashboardPage = ({ user, onLogout }) => {
               <DropdownMenuTrigger asChild>
                 <button 
                   className={`inline-flex items-center gap-2 px-4 py-2.5 font-medium transition-all border-0 rounded-lg ${
-                    ['users', 'employees', 'documents', 'brands', 'royaltyentry', 'royaltysummary', 'royaltypayees', 'targets', 'expenseentry', 'pettycashsummary'].includes(activeTab)
+                    ['users', 'employees', 'documents', 'brands', 'royaltyentry', 'royaltysummary', 'royaltypayees', 'targets', 'expenseentry', 'pettycashsummary', 'business-config'].includes(activeTab)
                       ? 'bg-transparent text-white border-2 border-white'
                       : 'text-gray-300 hover:text-white hover:bg-white/10'
                   }`}
@@ -408,7 +412,7 @@ const DashboardPage = ({ user, onLogout }) => {
                   className="cursor-pointer hover:bg-white/10 focus:bg-white/10 focus:text-white"
                 >
                   <Target className="w-4 h-4 mr-2" />
-                  Restaurant Targets
+                  {`${labels.entity} Targets`}
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => setActiveTab("expenseentry")}
@@ -425,12 +429,21 @@ const DashboardPage = ({ user, onLogout }) => {
                   Petty Cash Summary
                 </DropdownMenuItem>
                 {(user.role === "admin" || user.role === "superuser") && (
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => setActiveTab("brands")}
                     className="cursor-pointer hover:bg-white/10 focus:bg-white/10 focus:text-white"
                   >
                     <Tag className="w-4 h-4 mr-2" />
                     Brands
+                  </DropdownMenuItem>
+                )}
+                {(user.role === "admin" || user.role === "superuser") && (
+                  <DropdownMenuItem
+                    onClick={() => setActiveTab("business-config")}
+                    className="cursor-pointer hover:bg-white/10 focus:bg-white/10 focus:text-white"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Business Settings
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -447,7 +460,7 @@ const DashboardPage = ({ user, onLogout }) => {
                   Filter & Group Data
                 </CardTitle>
                 <CardDescription>
-                  Filter revenue data by date range and group by different periods
+                  {`Filter ${labels.revenue.toLowerCase()} data by date range and group by different periods`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -481,19 +494,19 @@ const DashboardPage = ({ user, onLogout }) => {
                       <SelectContent>
                         <SelectItem value="date">Daily</SelectItem>
                         <SelectItem value="month">Monthly</SelectItem>
-                        <SelectItem value="restaurant">Restaurant</SelectItem>
-                        <SelectItem value="brand">Brand</SelectItem>
+                        <SelectItem value="restaurant">{labels.entity}</SelectItem>
+                        <SelectItem value="brand">{labels.brand}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="brand-filter">Filter by Brand</Label>
+                    <Label htmlFor="brand-filter">{`Filter by ${labels.brand}`}</Label>
                     <Select value={selectedBrand} onValueChange={setSelectedBrand}>
                       <SelectTrigger data-testid="brand-filter-select">
-                        <SelectValue placeholder="All Brands" />
+                        <SelectValue placeholder={`All ${labels.brand}s`} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Brands</SelectItem>
+                        <SelectItem value="all">{`All ${labels.brand}s`}</SelectItem>
                         {getUniqueBrands().map((brand) => (
                           <SelectItem key={brand} value={brand}>
                             {brand}
@@ -547,9 +560,9 @@ const DashboardPage = ({ user, onLogout }) => {
           <TabsContent value="revenue" className="pt-6" data-testid="revenue-form-content">
             <Card className="max-w-2xl mx-auto shadow-xl border-0 bg-white/90 backdrop-blur-xl">
               <CardHeader>
-                <CardTitle className="text-2xl">Add Revenue Entry</CardTitle>
+                <CardTitle className="text-2xl">{`Add ${labels.revenue} Entry`}</CardTitle>
                 <CardDescription>
-                  Submit daily revenue for a restaurant
+                  {`Submit daily ${labels.revenue.toLowerCase()} for a ${labels.entity.toLowerCase()}`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -564,9 +577,9 @@ const DashboardPage = ({ user, onLogout }) => {
           <TabsContent value="history" className="pt-6" data-testid="history-content">
             <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
               <CardHeader>
-                <CardTitle className="text-2xl">Revenue History</CardTitle>
+                <CardTitle className="text-2xl">{`${labels.revenue} History`}</CardTitle>
                 <CardDescription>
-                  View and manage all submitted revenue entries
+                  {`View and manage all submitted ${labels.revenue.toLowerCase()} entries`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -587,9 +600,9 @@ const DashboardPage = ({ user, onLogout }) => {
             <TabsContent value="restaurants" className="pt-6" data-testid="restaurants-content">
               <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
                 <CardHeader>
-                  <CardTitle className="text-2xl">Manage Restaurants</CardTitle>
+                  <CardTitle className="text-2xl">{`Manage ${labels.entities}`}</CardTitle>
                   <CardDescription>
-                    Add, edit, or delete restaurants
+                    {`Add, edit, or delete ${labels.entities.toLowerCase()}`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -606,9 +619,9 @@ const DashboardPage = ({ user, onLogout }) => {
             <TabsContent value="categories" className="pt-6" data-testid="categories-content">
               <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-xl">
                 <CardHeader>
-                  <CardTitle className="text-2xl">Revenue Categories</CardTitle>
+                  <CardTitle className="text-2xl">{`${labels.revenue} Categories`}</CardTitle>
                   <CardDescription>
-                    Manage revenue categories for detailed reporting
+                    {`Manage ${labels.revenue.toLowerCase()} categories for detailed reporting`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -663,6 +676,12 @@ const DashboardPage = ({ user, onLogout }) => {
           <TabsContent value="pettycashsummary" className="pt-6" data-testid="pettycashsummary-content">
             <PettyCashSummary restaurants={restaurants} />
           </TabsContent>
+
+          {(user.role === "admin" || user.role === "superuser") && (
+            <TabsContent value="business-config" className="pt-6" data-testid="business-config-content">
+              <BusinessConfigManager />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 
@@ -769,7 +788,7 @@ const DashboardPage = ({ user, onLogout }) => {
               }}
             >
               <DollarSign className="w-4 h-4" />
-              Add Revenue
+              {`Add ${labels.revenue}`}
             </Button>
 
             {/* More Options - Expandable */}
@@ -801,7 +820,7 @@ const DashboardPage = ({ user, onLogout }) => {
                     }}
                   >
                     <Building2 className="w-4 h-4" />
-                    Restaurants
+                    {labels.entities}
                   </Button>
 
                   <Button
@@ -813,7 +832,7 @@ const DashboardPage = ({ user, onLogout }) => {
                     }}
                   >
                     <FileSpreadsheet className="w-4 h-4" />
-                    Revenue Categories
+                    {`${labels.revenue} Categories`}
                   </Button>
 
                   <Button
@@ -851,6 +870,19 @@ const DashboardPage = ({ user, onLogout }) => {
                     >
                       <Users className="w-4 h-4" />
                       User Management
+                    </Button>
+                  )}
+                  {(user.role === "admin" || user.role === "superuser") && (
+                    <Button
+                      variant={activeTab === "business-config" ? "default" : "ghost"}
+                      className="w-full justify-start gap-2"
+                      onClick={() => {
+                        setActiveTab("business-config");
+                        setMobileMenuOpen(false);
+                      }}
+                    >
+                      <Settings className="w-4 h-4" />
+                      Business Settings
                     </Button>
                   )}
                 </div>

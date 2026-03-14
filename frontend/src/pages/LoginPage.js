@@ -6,11 +6,13 @@ import { Card } from "@/components/ui/card";
 import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Building2, TrendingUp } from "lucide-react";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const LoginPage = ({ onLogin }) => {
   const [loginData, setLoginData] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
+  const { labels } = useBusinessConfig();
 
   // Check if database is empty (first-time setup)
   useEffect(() => {
@@ -48,16 +50,16 @@ const LoginPage = ({ onLogin }) => {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm border border-gray-200">
               <Building2 className="w-6 h-6 text-blue-600" />
-              <span className="font-semibold text-gray-800">Food Court Manager</span>
+              <span className="font-semibold text-gray-800">{labels.appName}</span>
             </div>
             <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
               Track Your
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-600">
-                Revenue Flow
+                {labels.revenue} Flow
               </span>
             </h1>
             <p className="text-lg text-gray-600 max-w-md">
-              Manage multiple restaurants, track daily revenue, and get insights with beautiful analytics.
+              {`Manage multiple ${labels.entities.toLowerCase()}, track daily ${labels.revenue.toLowerCase()}`}, and get insights with beautiful analytics.
             </p>
           </div>
 
@@ -77,8 +79,8 @@ const LoginPage = ({ onLogin }) => {
                 <Building2 className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Multi-Restaurant Support</h3>
-                <p className="text-sm text-gray-600">Manage all your restaurants in one place</p>
+                <h3 className="font-semibold text-gray-900 mb-1">Multi-{labels.entity} Support</h3>
+                <p className="text-sm text-gray-600">{`Manage all your ${labels.entities.toLowerCase()} in one place`}</p>
               </div>
             </div>
           </div>

@@ -31,18 +31,19 @@ import {
 import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const RestaurantManager = ({ restaurants, onUpdate }) => {
+  const { labels, config } = useBusinessConfig();
+  const customFields = (config.custom_fields || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+
   const [open, setOpen] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState(null);
-  const [formData, setFormData] = useState({ 
-    name: "", 
-    description: "", 
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
     brand: "",
-    gst_number: "",
-    address: "",
-    phone: "",
-    msme_number: ""
+    custom_fields: {}
   });
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -67,22 +68,26 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const payload = {
+        ...formData,
+        gst_number: formData.custom_fields?.gst_number || "",
+        address: formData.custom_fields?.address || "",
+        phone: formData.custom_fields?.phone || "",
+        msme_number: formData.custom_fields?.msme_number || "",
+      };
       if (editingRestaurant) {
-        await axiosInstance.put(`/restaurants/${editingRestaurant.id}`, formData);
-        toast.success("Restaurant updated successfully!");
+        await axiosInstance.put(`/restaurants/${editingRestaurant.id}`, payload);
+        toast.success(`${labels.entity} updated successfully!`);
       } else {
-        await axiosInstance.post("/restaurants", formData);
-        toast.success("Restaurant added successfully!");
+        await axiosInstance.post("/restaurants", payload);
+        toast.success(`${labels.entity} added successfully!`);
       }
       setOpen(false);
-      setFormData({ 
-        name: "", 
-        description: "", 
+      setFormData({
+        name: "",
+        description: "",
         brand: "",
-        gst_number: "",
-        address: "",
-        phone: "",
-        msme_number: ""
+        custom_fields: {}
       });
       setEditingRestaurant(null);
       onUpdate();
@@ -95,14 +100,16 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
 
   const handleEdit = (restaurant) => {
     setEditingRestaurant(restaurant);
-    setFormData({ 
-      name: restaurant.name, 
-      description: restaurant.description, 
+    setFormData({
+      name: restaurant.name,
+      description: restaurant.description,
       brand: restaurant.brand || "",
-      gst_number: restaurant.gst_number || "",
-      address: restaurant.address || "",
-      phone: restaurant.phone || "",
-      msme_number: restaurant.msme_number || ""
+      custom_fields: restaurant.custom_fields || {
+        gst_number: restaurant.gst_number || "",
+        phone: restaurant.phone || "",
+        address: restaurant.address || "",
+        msme_number: restaurant.msme_number || ""
+      }
     });
     setOpen(true);
   };
@@ -110,12 +117,12 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
   const handleDelete = async (id) => {
     try {
       await axiosInstance.delete(`/restaurants/${id}`);
-      toast.success("Restaurant deleted successfully!");
+      toast.success(`${labels.entity} deleted successfully!`);
       setDeleteDialogOpen(false);
       setRestaurantToDelete(null);
       onUpdate();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to delete restaurant");
+      toast.error(error.response?.data?.detail || `Failed to delete ${labels.entity.toLowerCase()}`);
     }
   };
 
@@ -126,14 +133,11 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
 
   const handleClose = () => {
     setOpen(false);
-    setFormData({ 
-      name: "", 
-      description: "", 
+    setFormData({
+      name: "",
+      description: "",
       brand: "",
-      gst_number: "",
-      address: "",
-      phone: "",
-      msme_number: ""
+      custom_fields: {}
     });
     setEditingRestaurant(null);
   };
@@ -167,41 +171,41 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
           <DialogTrigger asChild>
             <Button className="gap-2 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700" data-testid="add-restaurant-button">
               <Plus className="w-4 h-4" />
-              Add Restaurant
+              {`Add ${labels.entity}`}
             </Button>
           </DialogTrigger>
         <DialogContent data-testid="restaurant-dialog">
           <DialogHeader>
             <DialogTitle>
-              {editingRestaurant ? "Edit Restaurant" : "Add New Restaurant"}
+              {editingRestaurant ? `Edit ${labels.entity}` : `Add New ${labels.entity}`}
             </DialogTitle>
             <DialogDescription>
               {editingRestaurant
-                ? "Update the restaurant details below."
-                : "Enter the details for the new restaurant."}
+                ? `Update the ${labels.entity.toLowerCase()} details below.`
+                : `Enter the details for the new ${labels.entity.toLowerCase()}.`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Restaurant Name *</Label>
+              <Label htmlFor="name">{`${labels.entity} Name`} *</Label>
               <Input
                 id="name"
                 data-testid="restaurant-name-input"
-                placeholder="Enter restaurant name"
+                placeholder={`Enter ${labels.entity.toLowerCase()} name`}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="brand">Brand/Group *</Label>
+              <Label htmlFor="brand">{`${labels.brand}/Group`} *</Label>
               <Select
                 value={formData.brand}
                 onValueChange={(value) => setFormData({ ...formData, brand: value })}
                 required
               >
                 <SelectTrigger data-testid="restaurant-brand-select">
-                  <SelectValue placeholder="Select a brand" />
+                  <SelectValue placeholder={`Select a ${labels.brand.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {brands.map((brand) => (
@@ -212,7 +216,7 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                Group multiple centers under same brand for aggregate reporting
+                {`Group multiple ${labels.entities.toLowerCase()} under same ${labels.brand.toLowerCase()} for aggregate reporting`}
               </p>
             </div>
             <div className="space-y-2">
@@ -220,7 +224,7 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
               <Textarea
                 id="description"
                 data-testid="restaurant-description-input"
-                placeholder="Enter restaurant description"
+                placeholder={`Enter ${labels.entity.toLowerCase()} description`}
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
@@ -229,54 +233,40 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
               />
             </div>
             
-            {/* Additional Restaurant Details */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="gst_number">GST Number</Label>
-                <Input
-                  id="gst_number"
-                  data-testid="restaurant-gst-input"
-                  placeholder="e.g., 22AAAAA0000A1Z5"
-                  value={formData.gst_number}
-                  onChange={(e) => setFormData({ ...formData, gst_number: e.target.value })}
-                />
+            {/* Dynamic Custom Fields */}
+            {customFields.map((field) => (
+              <div key={field.field_key} className="space-y-2">
+                <Label htmlFor={field.field_key}>
+                  {field.label}{field.required ? " *" : ""}
+                </Label>
+                {field.field_type === "textarea" ? (
+                  <textarea
+                    id={field.field_key}
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    placeholder={field.placeholder}
+                    value={(formData.custom_fields || {})[field.field_key] || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fields: { ...(formData.custom_fields || {}), [field.field_key]: e.target.value }
+                    })}
+                    rows={2}
+                    required={field.required}
+                  />
+                ) : (
+                  <Input
+                    id={field.field_key}
+                    type={field.field_type === "number" ? "number" : "text"}
+                    placeholder={field.placeholder}
+                    value={(formData.custom_fields || {})[field.field_key] || ""}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      custom_fields: { ...(formData.custom_fields || {}), [field.field_key]: e.target.value }
+                    })}
+                    required={field.required}
+                  />
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  data-testid="restaurant-phone-input"
-                  placeholder="e.g., +91 98765 43210"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
-                data-testid="restaurant-address-input"
-                placeholder="Enter full restaurant address"
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-                rows={2}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="msme_number">MSME Number</Label>
-              <Input
-                id="msme_number"
-                data-testid="restaurant-msme-input"
-                placeholder="Enter MSME registration number"
-                value={formData.msme_number}
-                onChange={(e) => setFormData({ ...formData, msme_number: e.target.value })}
-              />
-            </div>
+            ))}
             
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={handleClose} data-testid="cancel-restaurant-button">
@@ -296,7 +286,7 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
               type="text"
-              placeholder="Search restaurants by name, brand, phone, address..."
+              placeholder={`Search ${labels.entities.toLowerCase()} by name, ${labels.brand.toLowerCase()}, phone, address...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -318,36 +308,25 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
             </h3>
             {restaurant.brand && (
               <p className="text-xs font-medium text-blue-600 mb-2">
-                Brand: {brands.find(b => b.id === restaurant.brand)?.name || restaurant.brand}
+                {labels.brand}: {brands.find(b => b.id === restaurant.brand)?.name || restaurant.brand}
               </p>
             )}
             <p className="text-sm text-gray-600 mb-3 line-clamp-2">
               {restaurant.description || "No description"}
             </p>
             
-            {/* Additional Details */}
+            {/* Dynamic Custom Fields Display */}
             <div className="space-y-1.5 mb-4 text-xs text-gray-600">
-              {restaurant.phone && (
-                <p className="flex items-center gap-1">
-                  <span className="font-medium">Phone:</span> {restaurant.phone}
-                </p>
-              )}
-              {restaurant.address && (
-                <p className="flex items-start gap-1">
-                  <span className="font-medium">Address:</span> 
-                  <span className="line-clamp-2">{restaurant.address}</span>
-                </p>
-              )}
-              {restaurant.gst_number && (
-                <p className="flex items-center gap-1">
-                  <span className="font-medium">GST:</span> {restaurant.gst_number}
-                </p>
-              )}
-              {restaurant.msme_number && (
-                <p className="flex items-center gap-1">
-                  <span className="font-medium">MSME:</span> {restaurant.msme_number}
-                </p>
-              )}
+              {customFields.map((field) => {
+                const value = restaurant.custom_fields?.[field.field_key] || restaurant[field.field_key];
+                if (!value) return null;
+                return (
+                  <p key={field.field_key} className="flex items-start gap-1">
+                    <span className="font-medium">{field.label}:</span>
+                    <span className="line-clamp-2">{value}</span>
+                  </p>
+                );
+              })}
             </div>
             
             <div className="flex gap-2">
@@ -378,13 +357,13 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
 
       {restaurants.length === 0 && (
         <div className="text-center py-12 text-gray-500">
-          No restaurants yet. Click &quot;Add Restaurant&quot; to get started.
+          {`No ${labels.entities.toLowerCase()} yet. Click "Add ${labels.entity}" to get started.`}
         </div>
       )}
       
       {restaurants.length > 0 && filteredRestaurants.length === 0 && (
         <div className="text-center py-12 text-gray-500">
-          No restaurants found matching &quot;{searchQuery}&quot;. Try a different search term.
+          {`No ${labels.entities.toLowerCase()} found matching "${searchQuery}". Try a different search term.`}
         </div>
       )}
 
@@ -396,7 +375,7 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete{" "}
               <span className="font-semibold">{restaurantToDelete?.name}</span> and
-              remove all associated revenue data from the system.
+              remove all associated {labels.revenue.toLowerCase()} data from the system.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -406,7 +385,7 @@ const RestaurantManager = ({ restaurants, onUpdate }) => {
               className="bg-red-600 hover:bg-red-700"
               data-testid="confirm-delete-button"
             >
-              Delete Restaurant
+              {`Delete ${labels.entity}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

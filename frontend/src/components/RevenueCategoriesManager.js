@@ -41,8 +41,10 @@ import { toast } from "sonner";
 import { Plus, Edit, Trash2, MoreVertical, Settings, Tag, Search } from "lucide-react";
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
 import CategoryMasterManager from "./CategoryMasterManager";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
+  const { labels } = useBusinessConfig();
   const [open, setOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({ 
@@ -253,8 +255,8 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
               <Tag className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Revenue Categories</h2>
-            <p className="text-sm text-gray-600">Manage categories for revenue entry forms</p>
+            <h2 className="text-xl font-bold text-gray-900">{`${labels.revenue} Categories`}</h2>
+            <p className="text-sm text-gray-600">{`Manage categories for ${labels.revenue.toLowerCase()} entry forms`}</p>
           </div>
         </div>
 
@@ -273,21 +275,21 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
         <DialogContent data-testid="category-dialog">
           <DialogHeader>
             <DialogTitle>
-              {editingCategory ? `Edit Categories - ${editingCategory.restaurant_name}` : "Add New Revenue Categories"}
+              {editingCategory ? `Edit Categories - ${editingCategory.restaurant_name}` : `Add New ${labels.revenue} Categories`}
             </DialogTitle>
             <DialogDescription>
               {editingCategory
-                ? "Select which categories should be mapped to this restaurant."
-                : "Select multiple categories to add to the restaurant."}
+                ? `Select which categories should be mapped to this ${labels.entity.toLowerCase()}.`
+                : `Select multiple categories to add to the ${labels.entity.toLowerCase()}.`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Restaurant Selection */}
             <div className="space-y-2">
-              <Label>Restaurant *</Label>
+              <Label>{`${labels.entity} *`}</Label>
               <Select value={bulkRestaurantId} onValueChange={setBulkRestaurantId} disabled={!!editingCategory}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a restaurant" />
+                  <SelectValue placeholder={`Select a ${labels.entity.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {restaurants?.map((restaurant) => (
@@ -298,7 +300,7 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
                 </SelectContent>
               </Select>
               {editingCategory && (
-                <p className="text-xs text-gray-500">Restaurant cannot be changed while editing</p>
+                <p className="text-xs text-gray-500">{`${labels.entity} cannot be changed while editing`}</p>
               )}
             </div>
 
@@ -361,7 +363,7 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
               <div className="space-y-1">
                 <Label>Required Field</Label>
                 <p className="text-sm text-gray-600">
-                  Make these categories mandatory for revenue entries
+                  {`Make these categories mandatory for ${labels.revenue.toLowerCase()} entries`}
                 </p>
               </div>
               <Switch checked={bulkIsRequired} onCheckedChange={setBulkIsRequired} />
@@ -385,7 +387,7 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
           <DialogHeader>
             <DialogTitle>Manage Category Master List</DialogTitle>
             <DialogDescription>
-              Add, edit, or delete category templates for revenue tracking
+              {`Add, edit, or delete category templates for ${labels.revenue.toLowerCase()} tracking`}
             </DialogDescription>
           </DialogHeader>
           <CategoryMasterManager />
@@ -406,7 +408,7 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
             type="text"
-            placeholder="Search categories by name, description, or restaurant..."
+            placeholder={`Search categories by name, description, or ${labels.entity.toLowerCase()}...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -498,7 +500,7 @@ const RevenueCategoriesManager = ({ categories, restaurants, onUpdate }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete All Categories for {deleteDialog.restaurantGroup?.restaurant_name}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete all {deleteDialog.restaurantGroup?.categories.length} categories for this restaurant? This action cannot be undone.
+              {`Are you sure you want to delete all ${deleteDialog.restaurantGroup?.categories.length} categories for this ${labels.entity.toLowerCase()}? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

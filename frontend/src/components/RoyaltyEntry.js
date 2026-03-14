@@ -23,6 +23,7 @@ import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { DollarSign, Plus, Calendar } from "lucide-react";
 import { CurrencyDisplay } from "./CurrencySettings";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const MONTHS = [
   { value: 1, label: "January" },
@@ -49,6 +50,7 @@ const ROYALTY_TYPES = [
 ];
 
 const RoyaltyEntry = ({ restaurants }) => {
+  const { labels } = useBusinessConfig();
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   
@@ -275,13 +277,13 @@ const RoyaltyEntry = ({ restaurants }) => {
 
             {/* Restaurant (Optional) */}
             <div className="space-y-2">
-              <Label>Restaurant (Optional)</Label>
+              <Label>{`${labels.entity} (Optional)`}</Label>
               <Select
                 value={formData.restaurant_id || undefined}
                 onValueChange={(value) => setFormData({ ...formData, restaurant_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="None - Not linked to any restaurant" />
+                  <SelectValue placeholder={`None - Not linked to any ${labels.entity.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {restaurants && restaurants.map((restaurant) => (
@@ -292,7 +294,7 @@ const RoyaltyEntry = ({ restaurants }) => {
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                Leave unselected if not related to a specific restaurant
+                {`Leave unselected if not related to a specific ${labels.entity.toLowerCase()}`}
               </p>
             </div>
 

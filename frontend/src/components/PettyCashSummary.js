@@ -34,10 +34,12 @@ import { toast } from "sonner";
 import { Search, Edit, Trash2, Eye, Download, TrendingUp, Receipt, Calendar } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const PAYMENT_METHODS = ["Cash", "UPI", "Card", "Other"];
 
 const PettyCashSummary = ({ restaurants }) => {
+  const { labels } = useBusinessConfig();
   const [entries, setEntries] = useState([]);
   const [filteredEntries, setFilteredEntries] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -327,13 +329,13 @@ const PettyCashSummary = ({ restaurants }) => {
             </div>
 
             <div className="space-y-2">
-              <Label>Filter by Restaurant</Label>
+              <Label>{`Filter by ${labels.entity}`}</Label>
               <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Restaurants" />
+                  <SelectValue placeholder={`All ${labels.entities}`} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Restaurants</SelectItem>
+                  <SelectItem value="all">{`All ${labels.entities}`}</SelectItem>
                   {restaurants && restaurants.map((restaurant) => (
                     <SelectItem key={restaurant.id} value={restaurant.id}>
                       {restaurant.name}

@@ -34,6 +34,7 @@ import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Search, Edit, Trash2, FileText, DollarSign, TrendingUp, Download, Filter } from "lucide-react";
 import { CurrencyDisplay } from "./CurrencySettings";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -47,6 +48,7 @@ const ROYALTY_TYPES = [
 ];
 
 const RoyaltySummary = ({ restaurants }) => {
+  const { labels } = useBusinessConfig();
   const [entries, setEntries] = useState([]);
   const [filteredEntries, setFilteredEntries] = useState([]);
   const [payees, setPayees] = useState([]);
@@ -365,13 +367,13 @@ const RoyaltySummary = ({ restaurants }) => {
             </div>
 
             <div className="space-y-2">
-              <Label>Filter by Restaurant</Label>
+              <Label>{`Filter by ${labels.entity}`}</Label>
               <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Restaurants" />
+                  <SelectValue placeholder={`All ${labels.entities}`} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Restaurants</SelectItem>
+                  <SelectItem value="all">{`All ${labels.entities}`}</SelectItem>
                   {restaurants && restaurants.map((restaurant) => (
                     <SelectItem key={restaurant.id} value={restaurant.id}>
                       {restaurant.name}

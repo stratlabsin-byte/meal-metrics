@@ -15,8 +15,10 @@ import { toast } from "sonner";
 import { CurrencyDisplay } from "./CurrencySettings";
 import { FileSpreadsheet, Download, Filter } from "lucide-react";
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const ReportsTable = ({ restaurants }) => {
+  const { labels } = useBusinessConfig();
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [groupBy, setGroupBy] = useState("restaurant");
@@ -262,7 +264,7 @@ const ReportsTable = ({ restaurants }) => {
     
     // Generate CSV based on grouping type
     if (groupBy === "brand") {
-      csvContent = "Brand,Total Revenue,Entries,Category Breakdown\n";
+      csvContent = `${labels.brand},Total ${labels.revenue},Entries,Category Breakdown\n`;
       reportData.forEach(row => {
         const categoryBreakdown = Object.entries(row.categories || {})
           .map(([catId, amount]) => {
@@ -274,7 +276,7 @@ const ReportsTable = ({ restaurants }) => {
         csvContent += `"${row.brand_name}",${row.total_revenue},${row.entries},"${categoryBreakdown}"\n`;
       });
     } else if (groupBy === "restaurant") {
-      csvContent = "Restaurant,Total Revenue,Entries,Category Breakdown\n";
+      csvContent = `${labels.entity},Total ${labels.revenue},Entries,Category Breakdown\n`;
       reportData.forEach(row => {
         const categoryBreakdown = Object.entries(row.categories || {})
           .map(([catId, amount]) => {
@@ -286,17 +288,17 @@ const ReportsTable = ({ restaurants }) => {
         csvContent += `"${row.restaurant_name}",${row.total_revenue},${row.entries},"${categoryBreakdown}"\n`;
       });
     } else if (groupBy === "category") {
-      csvContent = "Category,Total Revenue,Entries\n";
+      csvContent = `Category,Total ${labels.revenue},Entries\n`;
       reportData.forEach(row => {
         csvContent += `"${row.category_name}",${row.total_revenue},${row.entries}\n`;
       });
     } else if (groupBy === "date") {
-      csvContent = "Date,Total Revenue,Entries\n";
+      csvContent = `Date,Total ${labels.revenue},Entries\n`;
       reportData.forEach(row => {
         csvContent += `"${row.date}",${row.total_revenue},${row.entries}\n`;
       });
     } else if (groupBy === "all") {
-      csvContent = "Restaurant,Date,Total Revenue,Entries,Categories\n";
+      csvContent = `${labels.entity},Date,Total ${labels.revenue},Entries,Categories\n`;
       reportData.forEach(row => {
         const categories = Object.values(row.categories).map(c => `${c.name}: ${c.amount}`).join("; ");
         csvContent += `"${row.restaurant_name}","${row.date}",${row.total_revenue},${row.entries},"${categories}"\n`;
@@ -332,11 +334,11 @@ const ReportsTable = ({ restaurants }) => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="brand">Brand</SelectItem>
-                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="brand">{labels.brand}</SelectItem>
+                  <SelectItem value="restaurant">{labels.entity}</SelectItem>
                   <SelectItem value="category">Category</SelectItem>
                   <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="all">All (Restaurant + Date + Category)</SelectItem>
+                  <SelectItem value="all">All ({labels.entity} + Date + Category)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -357,13 +359,13 @@ const ReportsTable = ({ restaurants }) => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Filter by Restaurant</Label>
+              <Label>{`Filter by ${labels.entity}`}</Label>
               <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Restaurants" />
+                  <SelectValue placeholder={`All ${labels.entities}`} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Restaurants</SelectItem>
+                  <SelectItem value="all">{`All ${labels.entities}`}</SelectItem>
                   {restaurants.map((restaurant) => (
                     <SelectItem key={restaurant.id} value={restaurant.id}>
                       {restaurant.name}
@@ -428,16 +430,16 @@ const ReportsTable = ({ restaurants }) => {
                   <tr className="bg-gray-100 border-b-2 border-gray-300">
                     {groupBy === "brand" && (
                       <>
-                        <th className="text-left p-3 font-semibold">Brand</th>
-                        <th className="text-right p-3 font-semibold">Total Revenue</th>
+                        <th className="text-left p-3 font-semibold">{labels.brand}</th>
+                        <th className="text-right p-3 font-semibold">{`Total ${labels.revenue}`}</th>
                         <th className="text-right p-3 font-semibold">Entries</th>
                         <th className="text-left p-3 font-semibold">Category Breakdown</th>
                       </>
                     )}
                     {groupBy === "restaurant" && (
                       <>
-                        <th className="text-left p-3 font-semibold">Restaurant</th>
-                        <th className="text-right p-3 font-semibold">Total Revenue</th>
+                        <th className="text-left p-3 font-semibold">{labels.entity}</th>
+                        <th className="text-right p-3 font-semibold">{`Total ${labels.revenue}`}</th>
                         <th className="text-right p-3 font-semibold">Entries</th>
                         <th className="text-left p-3 font-semibold">Category Breakdown</th>
                       </>
@@ -445,22 +447,22 @@ const ReportsTable = ({ restaurants }) => {
                     {groupBy === "category" && (
                       <>
                         <th className="text-left p-3 font-semibold">Category</th>
-                        <th className="text-right p-3 font-semibold">Total Revenue</th>
+                        <th className="text-right p-3 font-semibold">{`Total ${labels.revenue}`}</th>
                         <th className="text-right p-3 font-semibold">Entries</th>
                       </>
                     )}
                     {groupBy === "date" && (
                       <>
                         <th className="text-left p-3 font-semibold">Date</th>
-                        <th className="text-right p-3 font-semibold">Total Revenue</th>
+                        <th className="text-right p-3 font-semibold">{`Total ${labels.revenue}`}</th>
                         <th className="text-right p-3 font-semibold">Entries</th>
                       </>
                     )}
                     {groupBy === "all" && (
                       <>
-                        <th className="text-left p-3 font-semibold">Restaurant</th>
+                        <th className="text-left p-3 font-semibold">{labels.entity}</th>
                         <th className="text-left p-3 font-semibold">Date</th>
-                        <th className="text-right p-3 font-semibold">Total Revenue</th>
+                        <th className="text-right p-3 font-semibold">{`Total ${labels.revenue}`}</th>
                         <th className="text-right p-3 font-semibold">Entries</th>
                         <th className="text-left p-3 font-semibold">Categories</th>
                       </>

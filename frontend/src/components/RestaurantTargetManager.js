@@ -33,6 +33,7 @@ import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Target, Plus, Edit, Trash2, TrendingUp } from "lucide-react";
 import { CurrencyDisplay } from "./CurrencySettings";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const PERIOD_TYPES = [
   { value: "monthly", label: "Monthly" },
@@ -46,6 +47,7 @@ const QUARTERS = ["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"
 const HALVES = ["H1 (Apr-Sep)", "H2 (Oct-Mar)"];
 
 const RestaurantTargetManager = ({ restaurants }) => {
+  const { labels } = useBusinessConfig();
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   // Fiscal year starts in April
@@ -236,8 +238,8 @@ const RestaurantTargetManager = ({ restaurants }) => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Restaurant Targets</h2>
-          <p className="text-muted-foreground">Set and manage revenue targets for restaurants (Fiscal Year: April-March)</p>
+          <h2 className="text-3xl font-bold tracking-tight">{`${labels.entity} Targets`}</h2>
+          <p className="text-muted-foreground">{`Set and manage revenue targets for ${labels.entities.toLowerCase()} (Fiscal Year: April-March)`}</p>
         </div>
         <Button onClick={() => setAddDialog(true)} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -349,7 +351,7 @@ const RestaurantTargetManager = ({ restaurants }) => {
             <Target className="w-16 h-16 text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Targets Set</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Start by setting revenue targets for your restaurants
+              {`Start by setting revenue targets for your ${labels.entities.toLowerCase()}`}
             </p>
             <Button onClick={() => setAddDialog(true)} className="gap-2">
               <Plus className="w-4 h-4" />
@@ -371,7 +373,7 @@ const RestaurantTargetManager = ({ restaurants }) => {
           <DialogHeader>
             <DialogTitle>{editDialog.isOpen ? "Edit Target" : "Set New Target"}</DialogTitle>
             <DialogDescription>
-              Set revenue target for a restaurant (Fiscal Year: April to March)
+              {`Set revenue target for a ${labels.entity.toLowerCase()} (Fiscal Year: April to March)`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -382,7 +384,7 @@ const RestaurantTargetManager = ({ restaurants }) => {
                 onValueChange={(value) => setFormData({ ...formData, restaurant_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select restaurant" />
+                  <SelectValue placeholder={`Select ${labels.entity.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {restaurants && restaurants.map((restaurant) => (

@@ -32,8 +32,10 @@ import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Tag, Plus, Edit, Trash2, Search, MoreVertical } from "lucide-react";
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const BrandManager = () => {
+  const { labels } = useBusinessConfig();
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -143,7 +145,7 @@ const BrandManager = () => {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Brand / Group Master</h2>
-          <p className="text-muted-foreground">Manage master list of brands and groups for restaurants</p>
+          <p className="text-muted-foreground">{`Manage master list of brands and groups for ${labels.entities.toLowerCase()}`}</p>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -237,7 +239,7 @@ const BrandManager = () => {
           <DialogHeader>
             <DialogTitle>Add New Brand</DialogTitle>
             <DialogDescription>
-              Create a new brand/group that can be assigned to restaurants
+              {`Create a new brand/group that can be assigned to ${labels.entities.toLowerCase()}`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -320,7 +322,7 @@ const BrandManager = () => {
             <AlertDialogTitle>Delete Brand</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this brand? This action cannot be undone.
-              Restaurants using this brand will need to be updated.
+              {`${labels.entities} using this brand will need to be updated.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

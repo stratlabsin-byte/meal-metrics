@@ -32,8 +32,10 @@ import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Users, Plus, Edit, Trash2, Mail, Phone, Briefcase, DollarSign, Calendar, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const EmployeeManager = ({ restaurants }) => {
+  const { labels } = useBusinessConfig();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -194,15 +196,15 @@ const EmployeeManager = ({ restaurants }) => {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Employee Management</h2>
-          <p className="text-muted-foreground">Manage your restaurant employees</p>
+          <p className="text-muted-foreground">{`Manage your ${labels.entity.toLowerCase()} employees`}</p>
         </div>
         <div className="flex items-center gap-4">
           <Select value={filterRestaurant} onValueChange={setFilterRestaurant}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Restaurants" />
+              <SelectValue placeholder={`All ${labels.entities}`} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Restaurants</SelectItem>
+              <SelectItem value="all">{`All ${labels.entities}`}</SelectItem>
               {restaurants.map((restaurant) => (
                 <SelectItem key={restaurant.id} value={restaurant.id}>
                   {restaurant.name}
@@ -319,10 +321,10 @@ const EmployeeManager = ({ restaurants }) => {
           <CardContent className="flex flex-col items-center justify-center p-12">
             <Users className="w-16 h-16 text-gray-400 mb-4" />
             <h3 className="text-lg font-semibold mb-2">
-              {filterRestaurant === "all" ? "No Employees Yet" : "No Employees for This Restaurant"}
+              {filterRestaurant === "all" ? "No Employees Yet" : `No Employees for This ${labels.entity}`}
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              {filterRestaurant === "all" ? "Start by adding your first employee" : "Select another restaurant or add an employee"}
+              {filterRestaurant === "all" ? "Start by adding your first employee" : `Select another ${labels.entity.toLowerCase()} or add an employee`}
             </p>
             <Button onClick={() => setDialogOpen(true)} className="gap-2">
               <Plus className="w-4 h-4" />
@@ -439,7 +441,7 @@ const EmployeeManager = ({ restaurants }) => {
 
             {/* Restaurant Assignment */}
             <div className="space-y-2">
-              <Label>Assign to Restaurants *</Label>
+              <Label>{`Assign to ${labels.entities} *`}</Label>
               <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
                 {restaurants.map((restaurant) => (
                   <div key={restaurant.id} className="flex items-center space-x-2">

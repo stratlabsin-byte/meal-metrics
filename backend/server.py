@@ -11,13 +11,35 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
+import time
 from passlib.context import CryptContext
 from jose import jwt, JWTError
-import shutil
 import aiofiles
+import json
+import calendar
+
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# File upload security settings
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx', 'xls', 'xlsx'}
+MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+def validate_upload(file: UploadFile, allowed_extensions: set, max_size: int = MAX_UPLOAD_SIZE_BYTES):
+    """Validate file extension and size before saving."""
+    if not file.filename or '.' not in file.filename:
+        raise HTTPException(status_code=400, detail="File must have a valid extension")
+    extension = file.filename.rsplit('.', 1)[-1].lower()
+    if extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type '.{extension}' not allowed. Allowed: {', '.join(sorted(allowed_extensions))}"
+        )
+    return extension
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -28,9 +50,11 @@ db = client[os.environ['DB_NAME']]
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
-SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY environment variable is required. Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\"")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours (reduced from 7 days)
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -97,10 +121,75 @@ async def create_default_superadmin():
             print("=" * 60)
         else:
             print(f"✓ Database already has {user_count} user(s). Skipping default admin creation.")
+
+        # Ensure business config exists
+        config_count = await db.business_config.count_documents({})
+        if config_count == 0:
+            default_config = BusinessConfig()
+            config_doc = default_config.model_dump()
+            config_doc['created_at'] = config_doc['created_at'].isoformat()
+            config_doc['updated_at'] = config_doc['updated_at'].isoformat()
+            await db.business_config.insert_one(config_doc)
+            print("✓ Default business configuration created.")
+
+        # Migrate existing restaurants: copy legacy fields into custom_fields
+        restaurants_to_migrate = await db.restaurants.find(
+            {"custom_fields": {"$exists": False}}
+        ).to_list(10000)
+        if restaurants_to_migrate:
+            for restaurant in restaurants_to_migrate:
+                custom_fields = {}
+                for key in ["gst_number", "phone", "address", "msme_number"]:
+                    if restaurant.get(key):
+                        custom_fields[key] = restaurant[key]
+                await db.restaurants.update_one(
+                    {"_id": restaurant["_id"]},
+                    {"$set": {"custom_fields": custom_fields}}
+                )
+            print(f"✓ Migrated {len(restaurants_to_migrate)} restaurants to custom_fields format.")
+
     except Exception as e:
-        print(f"❌ Error creating default super admin: {e}")
+        print(f"❌ Error in startup: {e}")
 
 # Helper functions
+MIN_PASSWORD_LENGTH = 8
+
+def validate_password_strength(password: str):
+    """Enforce minimum password requirements."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters long")
+    if not re.search(r'[A-Z]', password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not re.search(r'[a-z]', password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+    if not re.search(r'[0-9]', password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+
+# Simple in-memory rate limiter for login attempts
+class LoginRateLimiter:
+    def __init__(self, max_attempts: int = 5, window_seconds: int = 300):
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self._attempts: dict[str, list[float]] = defaultdict(list)
+
+    def check(self, key: str):
+        now = time.time()
+        # Remove expired attempts
+        self._attempts[key] = [t for t in self._attempts[key] if now - t < self.window_seconds]
+        if len(self._attempts[key]) >= self.max_attempts:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many login attempts. Try again in {self.window_seconds // 60} minutes."
+            )
+
+    def record(self, key: str):
+        self._attempts[key].append(time.time())
+
+    def clear(self, key: str):
+        self._attempts.pop(key, None)
+
+login_limiter = LoginRateLimiter(max_attempts=5, window_seconds=300)
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -180,6 +269,7 @@ class RestaurantCreate(BaseModel):
     address: Optional[str] = ""
     phone: Optional[str] = ""
     msme_number: Optional[str] = ""
+    custom_fields: Optional[dict] = {}
 
 class Restaurant(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -191,6 +281,7 @@ class Restaurant(BaseModel):
     address: Optional[str] = ""
     phone: Optional[str] = ""
     msme_number: Optional[str] = ""
+    custom_fields: dict = {}
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -428,6 +519,51 @@ class RestaurantDocument(BaseModel):
     uploaded_by: str
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Business Configuration Models
+class CustomFieldDefinition(BaseModel):
+    field_key: str
+    label: str
+    field_type: str = "text"  # text, number, date, textarea, select
+    placeholder: str = ""
+    required: bool = False
+    options: List[str] = []
+    order: int = 0
+
+class BusinessConfigCreate(BaseModel):
+    business_type: str = "Food Court"
+    app_name: str = "Food Court Manager"
+    entity_label_singular: str = "Restaurant"
+    entity_label_plural: str = "Restaurants"
+    revenue_label: str = "Revenue"
+    brand_label: str = "Brand"
+    document_types: List[dict] = []
+    custom_fields: List[dict] = []
+
+class BusinessConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    business_type: str = "Food Court"
+    app_name: str = "Food Court Manager"
+    entity_label_singular: str = "Restaurant"
+    entity_label_plural: str = "Restaurants"
+    revenue_label: str = "Revenue"
+    brand_label: str = "Brand"
+    document_types: List[dict] = [
+        {"value": "business_license", "label": "Business License"},
+        {"value": "health_permit", "label": "Health Permit"},
+        {"value": "tax_document", "label": "Tax Document"},
+        {"value": "contract", "label": "Contract"},
+        {"value": "other", "label": "Other"}
+    ]
+    custom_fields: List[dict] = [
+        {"field_key": "gst_number", "label": "GST Number", "field_type": "text", "placeholder": "e.g., 22AAAAA0000A1Z5", "required": False, "options": [], "order": 1},
+        {"field_key": "phone", "label": "Phone Number", "field_type": "text", "placeholder": "e.g., +91 98765 43210", "required": False, "options": [], "order": 2},
+        {"field_key": "address", "label": "Address", "field_type": "textarea", "placeholder": "Enter full address", "required": False, "options": [], "order": 3},
+        {"field_key": "msme_number", "label": "MSME Number", "field_type": "text", "placeholder": "Enter MSME registration number", "required": False, "options": [], "order": 4}
+    ]
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class DashboardStats(BaseModel):
     total_revenue: float
     total_entries: int
@@ -462,6 +598,7 @@ async def update_user(user_id: str, user_update: UserUpdate, current_user: dict 
     
     # Update password if provided
     if user_update.password:
+        validate_password_strength(user_update.password)
         update_data['password'] = hash_password(user_update.password)
     
     # Update status if provided
@@ -532,6 +669,7 @@ async def update_own_profile(profile_update: ProfileUpdate, current_user: dict =
     if profile_update.email is not None:
         update_data['email'] = profile_update.email
     if profile_update.password:
+        validate_password_strength(profile_update.password)
         update_data['password'] = hash_password(profile_update.password)
     
     await db.users.update_one({"id": current_user['id']}, {"$set": update_data})
@@ -564,7 +702,10 @@ async def create_user(user_data: UserRegister, current_user: dict = Depends(get_
     existing_user = await db.users.find_one({"username": user_data.username})
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
-    
+
+    # Validate password strength
+    validate_password_strength(user_data.password)
+
     # Create user with default permissions
     hashed_password = hash_password(user_data.password)
     
@@ -595,91 +736,80 @@ async def create_user(user_data: UserRegister, current_user: dict = Depends(get_
     
     user_doc = user.model_dump()
     user_doc['created_at'] = user_doc['created_at'].isoformat()
+    user_doc['updated_at'] = user_doc['updated_at'].isoformat()
     user_doc['password'] = hashed_password
-    
+
     await db.users.insert_one(user_doc)
-    
+
     return {"message": "User created successfully", "user_id": user.id}
 
 # Check if database is empty (for first-time setup info)
 @api_router.get("/auth/check-setup")
 async def check_setup():
-    """Check if any users exist in the database"""
+    """Check if any users exist in the database (only reveals boolean, not count)"""
     user_count = await db.users.count_documents({})
-    return {"has_users": user_count > 0, "user_count": user_count}
+    return {"has_users": user_count > 0}
+
+# Business Configuration endpoints
+@api_router.get("/business-config")
+async def get_business_config():
+    """Public endpoint - returns business config for app branding (no auth required)."""
+    config = await db.business_config.find_one({}, {"_id": 0})
+    if not config:
+        default = BusinessConfig()
+        return default.model_dump()
+    return config
+
+@api_router.put("/business-config")
+async def update_business_config(config_data: BusinessConfigCreate, current_user: dict = Depends(get_current_user)):
+    """Update business configuration - admin/superuser only."""
+    require_admin_or_superuser(current_user)
+
+    existing = await db.business_config.find_one({})
+    update_dict = config_data.model_dump()
+    update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+    if existing:
+        await db.business_config.update_one(
+            {"id": existing["id"]},
+            {"$set": update_dict}
+        )
+    else:
+        new_config = BusinessConfig(**config_data.model_dump())
+        doc = new_config.model_dump()
+        doc['created_at'] = datetime.now(timezone.utc).isoformat()
+        doc['updated_at'] = doc['created_at']
+        await db.business_config.insert_one(doc)
+
+    return await db.business_config.find_one({}, {"_id": 0})
 
 # Auth endpoints
-@api_router.post("/auth/register", response_model=UserResponse)
-async def register(user_data: UserRegister):
-    # Check if username exists
-    existing_user = await db.users.find_one({"username": user_data.username})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    
-    # Create user
-    hashed_password = hash_password(user_data.password)
-    
-    # Set default permissions based on role
-    # Format: {"section": "access_level"} where level is "none", "readonly", or "full"
-    default_permissions = {}
-    sections = ['dashboard', 'restaurants', 'revenue', 'revenue_categories', 'employees', 'documents', 'users', 'royalty', 'expenses', 'targets', 'brands']
-    
-    # Sections where managers should only have readonly access (cannot edit/delete)
-    readonly_sections_for_manager = ['royalty', 'expenses', 'targets', 'brands']
-    
-    if user_data.role == 'admin':
-        # Admin gets full access to all sections by default (can be restricted by superuser)
-        for section in sections:
-            default_permissions[section] = 'full'
-    elif user_data.role == 'manager':
-        # Manager gets full access to core modules, readonly to new modules, none to users
-        for section in sections:
-            if section == 'users':
-                default_permissions[section] = 'none'
-            elif section in readonly_sections_for_manager:
-                default_permissions[section] = 'readonly'
-            else:
-                default_permissions[section] = 'full'
-    # superuser gets no default permissions - they must be assigned by admin/superuser
-    
-    user = User(
-        username=user_data.username,
-        role=user_data.role,
-        permissions=default_permissions
-    )
-    
-    user_doc = user.model_dump()
-    user_doc['created_at'] = user_doc['created_at'].isoformat()
-    user_doc['password'] = hashed_password
-    
-    await db.users.insert_one(user_doc)
-    
-    # Generate token
-    token = create_access_token({"sub": user.id, "username": user.username, "role": user.role})
-    
-    return UserResponse(
-        id=user.id,
-        username=user.username,
-        role=user.role,
-        token=token
-    )
+# NOTE: Public /auth/register endpoint removed - use authenticated POST /users instead
 
 @api_router.post("/auth/login", response_model=UserResponse)
 async def login(user_data: UserLogin):
+    # Rate limit by username
+    login_limiter.check(user_data.username)
+
     user = await db.users.find_one({"username": user_data.username}, {"_id": 0})
     if not user:
+        login_limiter.record(user_data.username)
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     if not verify_password(user_data.password, user['password']):
+        login_limiter.record(user_data.username)
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     # Check if user is suspended
     if user.get('status') == 'suspended':
         raise HTTPException(status_code=403, detail="Account suspended. Contact administrator.")
-    
+
+    # Successful login - clear rate limit counter
+    login_limiter.clear(user_data.username)
+
     # Generate token
     token = create_access_token({"sub": user['id'], "username": user['username'], "role": user['role']})
-    
+
     return UserResponse(
         id=user['id'],
         username=user['username'],
@@ -705,6 +835,7 @@ async def create_restaurant(restaurant_data: RestaurantCreate, current_user: dic
         address=restaurant_data.address,
         phone=restaurant_data.phone,
         msme_number=restaurant_data.msme_number,
+        custom_fields=restaurant_data.custom_fields or {},
         created_by=current_user['id']
     )
     
@@ -717,8 +848,8 @@ async def create_restaurant(restaurant_data: RestaurantCreate, current_user: dic
 
 @api_router.get("/restaurants", response_model=List[Restaurant])
 async def get_restaurants(current_user: dict = Depends(get_current_user)):
-    # Admins see all restaurants
-    if current_user['role'] == 'admin':
+    # Admins and superusers see all restaurants
+    if current_user['role'] in ['admin', 'superuser']:
         restaurants = await db.restaurants.find({}, {"_id": 0}).to_list(1000)
     else:
         # Managers only see their assigned restaurants
@@ -748,13 +879,14 @@ async def update_restaurant(restaurant_id: str, restaurant_data: RestaurantCreat
     result = await db.restaurants.update_one(
         {"id": restaurant_id},
         {"$set": {
-            "name": restaurant_data.name, 
-            "description": restaurant_data.description, 
+            "name": restaurant_data.name,
+            "description": restaurant_data.description,
             "brand": restaurant_data.brand,
             "gst_number": restaurant_data.gst_number,
             "address": restaurant_data.address,
             "phone": restaurant_data.phone,
-            "msme_number": restaurant_data.msme_number
+            "msme_number": restaurant_data.msme_number,
+            "custom_fields": restaurant_data.custom_fields or {}
         }}
     )
     
@@ -1015,6 +1147,7 @@ async def delete_category_master(category_id: str, current_user: dict = Depends(
 # Royalty Payee Management Endpoints
 @api_router.post("/royalty-payees", response_model=RoyaltyPayee)
 async def create_royalty_payee(payee: RoyaltyPayeeCreate, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     # Check if payee already exists
     existing = await db.royalty_payees.find_one({"name": payee.name}, {"_id": 0})
     if existing:
@@ -1035,6 +1168,7 @@ async def get_royalty_payees(current_user: dict = Depends(get_current_user)):
 
 @api_router.put("/royalty-payees/{payee_id}", response_model=RoyaltyPayee)
 async def update_royalty_payee(payee_id: str, payee: RoyaltyPayeeCreate, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     # Check if another payee with same name exists
     existing = await db.royalty_payees.find_one({"name": payee.name, "id": {"$ne": payee_id}}, {"_id": 0})
     if existing:
@@ -1146,6 +1280,7 @@ async def update_royalty_entry(entry_id: str, entry: RoyaltyEntryCreate, current
 
 @api_router.delete("/royalty-entries/{entry_id}")
 async def delete_royalty_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     result = await db.royalty_entries.delete_one({"id": entry_id})
     
     if result.deleted_count == 0:
@@ -1156,6 +1291,7 @@ async def delete_royalty_entry(entry_id: str, current_user: dict = Depends(get_c
 # Restaurant Target Management Endpoints
 @api_router.post("/restaurant-targets", response_model=RestaurantTarget)
 async def create_restaurant_target(target: RestaurantTargetCreate, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     # Get restaurant name
     restaurant = await db.restaurants.find_one({"id": target.restaurant_id}, {"_id": 0})
     if not restaurant:
@@ -1210,6 +1346,7 @@ async def get_restaurant_target(target_id: str, current_user: dict = Depends(get
 
 @api_router.put("/restaurant-targets/{target_id}", response_model=RestaurantTarget)
 async def update_restaurant_target(target_id: str, target: RestaurantTargetCreate, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     # Get restaurant name
     restaurant = await db.restaurants.find_one({"id": target.restaurant_id}, {"_id": 0})
     if not restaurant:
@@ -1231,6 +1368,7 @@ async def update_restaurant_target(target_id: str, target: RestaurantTargetCreat
 
 @api_router.delete("/restaurant-targets/{target_id}")
 async def delete_restaurant_target(target_id: str, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     result = await db.restaurant_targets.delete_one({"id": target_id})
     
     if result.deleted_count == 0:
@@ -1241,6 +1379,7 @@ async def delete_restaurant_target(target_id: str, current_user: dict = Depends(
 # Expense Category Management
 @api_router.post("/expense-categories", response_model=ExpenseCategory)
 async def create_expense_category(category: ExpenseCategoryCreate, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     existing = await db.expense_categories.find_one({"name": category.name}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Category already exists")
@@ -1259,6 +1398,7 @@ async def get_expense_categories(current_user: dict = Depends(get_current_user))
 
 @api_router.put("/expense-categories/{category_id}", response_model=ExpenseCategory)
 async def update_expense_category(category_id: str, category: ExpenseCategoryCreate, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     result = await db.expense_categories.update_one(
         {"id": category_id},
         {"$set": category.model_dump()}
@@ -1269,6 +1409,7 @@ async def update_expense_category(category_id: str, category: ExpenseCategoryCre
 
 @api_router.delete("/expense-categories/{category_id}")
 async def delete_expense_category(category_id: str, current_user: dict = Depends(get_current_user)):
+    require_admin_or_superuser(current_user)
     result = await db.expense_categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -1458,18 +1599,13 @@ async def calculate_restaurant_target_achievement(
     end_year = fiscal_year + 1
     
     if period_type == "monthly" and period_value:
-        # Adjust for fiscal year months (April = 1, March = 12)
-        actual_month = (period_value + 2) % 12 + 1  # Convert fiscal month to calendar month
+        # Convert fiscal month (1=April, 12=March) to calendar month
+        # fiscal 1 -> April(4), fiscal 9 -> December(12), fiscal 10 -> January(1), fiscal 12 -> March(3)
+        actual_month = ((period_value - 1 + 3) % 12) + 1
         actual_year = start_year if period_value <= 9 else end_year
         start_date = f"{actual_year}-{actual_month:02d}-01"
-        # Get last day of month
-        if actual_month == 12:
-            end_date = f"{actual_year}-12-31"
-        else:
-            next_month = actual_month + 1
-            import calendar
-            last_day = calendar.monthrange(actual_year if next_month <= 12 else actual_year + 1, next_month if next_month <= 12 else 1)[1]
-            end_date = f"{actual_year}-{actual_month:02d}-{last_day}"
+        last_day = calendar.monthrange(actual_year, actual_month)[1]
+        end_date = f"{actual_year}-{actual_month:02d}-{last_day}"
     
     elif period_type == "quarterly" and period_value:
         # Q1: Apr-Jun, Q2: Jul-Sep, Q3: Oct-Dec, Q4: Jan-Mar
@@ -1515,9 +1651,14 @@ async def calculate_restaurant_target_achievement(
         "restaurant_name": target.get("restaurant_name", "")
     }
 
+# Helper: require admin or superuser role
+def require_admin_or_superuser(current_user: dict):
+    if current_user['role'] not in ['admin', 'superuser']:
+        raise HTTPException(status_code=403, detail="Admin or Superuser access required")
+
 # Helper function to check restaurant access
 async def check_restaurant_access(user_id: str, restaurant_id: str, role: str):
-    if role == 'admin':
+    if role in ['admin', 'superuser']:
         return True
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -1562,24 +1703,29 @@ async def create_revenue(revenue_data: RevenueCreate, current_user: dict = Depen
 @api_router.get("/revenues", response_model=List[Revenue])
 async def get_revenues(current_user: dict = Depends(get_current_user), restaurant_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
     query = {}
-    
+
     # Managers can only see revenues for their assigned restaurants
     if current_user['role'] == 'manager':
         user = await db.users.find_one({"id": current_user['id']}, {"_id": 0})
         assigned_restaurant_ids = user.get('assigned_restaurant_ids', [])
-        
+
         if not assigned_restaurant_ids:
             return []
-        
-        query['restaurant_id'] = {"$in": assigned_restaurant_ids}
-    
-    if restaurant_id:
+
+        if restaurant_id:
+            # Verify manager has access to the requested restaurant
+            if restaurant_id not in assigned_restaurant_ids:
+                raise HTTPException(status_code=403, detail="You don't have access to this restaurant")
+            query['restaurant_id'] = restaurant_id
+        else:
+            query['restaurant_id'] = {"$in": assigned_restaurant_ids}
+    elif restaurant_id:
         query['restaurant_id'] = restaurant_id
-    
+
     if start_date:
         query['date'] = query.get('date', {})
         query['date']['$gte'] = start_date
-    
+
     if end_date:
         query['date'] = query.get('date', {})
         query['date']['$lte'] = end_date
@@ -1740,9 +1886,8 @@ async def create_employee(
     current_user: dict = Depends(get_current_user)
 ):
     # Parse restaurant_ids from JSON string
-    import json
     restaurant_ids_list = json.loads(restaurant_ids)
-    
+
     # Check if user has access to the restaurants
     if current_user['role'] == 'manager':
         # Manager can only add employees to their assigned restaurants
@@ -1755,17 +1900,19 @@ async def create_employee(
     
     photo_url = None
     if photo:
-        # Save photo
-        file_extension = photo.filename.split('.')[-1]
+        # Validate and save photo
+        file_extension = validate_upload(photo, ALLOWED_IMAGE_EXTENSIONS)
         photo_filename = f"{uuid.uuid4()}.{file_extension}"
         photo_path = UPLOAD_DIR / "employee_photos" / photo_filename
-        
+
+        content = await photo.read()
+        if len(content) > MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB")
         async with aiofiles.open(photo_path, 'wb') as f:
-            content = await photo.read()
             await f.write(content)
-        
+
         photo_url = f"/api/uploads/employee_photos/{photo_filename}"
-    
+
     employee = Employee(
         name=name,
         email=email,
@@ -1899,9 +2046,8 @@ async def update_employee(
     photo: Optional[UploadFile] = File(None),
     current_user: dict = Depends(get_current_user)
 ):
-    import json
     restaurant_ids_list = json.loads(restaurant_ids)
-    
+
     employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -1917,21 +2063,25 @@ async def update_employee(
     
     photo_url = employee.get('photo_url')
     if photo:
+        # Validate new photo
+        file_extension = validate_upload(photo, ALLOWED_IMAGE_EXTENSIONS)
+
         # Delete old photo if exists
         if photo_url:
             old_photo_path = UPLOAD_DIR / photo_url.lstrip("/api/uploads/")
             if old_photo_path.exists():
                 old_photo_path.unlink()
-        
+
         # Save new photo
-        file_extension = photo.filename.split('.')[-1]
         photo_filename = f"{uuid.uuid4()}.{file_extension}"
         photo_path = UPLOAD_DIR / "employee_photos" / photo_filename
-        
+
+        content = await photo.read()
+        if len(content) > MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB")
         async with aiofiles.open(photo_path, 'wb') as f:
-            content = await photo.read()
             await f.write(content)
-        
+
         photo_url = f"/api/uploads/employee_photos/{photo_filename}"
     
     update_data = {
@@ -2000,15 +2150,17 @@ async def upload_restaurant_document(
         if restaurant_id not in user_restaurant_ids:
             raise HTTPException(status_code=403, detail="Cannot upload document to this restaurant")
     
-    # Save document
-    file_extension = file.filename.split('.')[-1]
+    # Validate and save document
+    file_extension = validate_upload(file, ALLOWED_DOCUMENT_EXTENSIONS)
     doc_filename = f"{uuid.uuid4()}.{file_extension}"
     doc_path = UPLOAD_DIR / "restaurant_documents" / doc_filename
-    
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB")
     async with aiofiles.open(doc_path, 'wb') as f:
-        content = await file.read()
         await f.write(content)
-    
+
     file_url = f"/api/uploads/restaurant_documents/{doc_filename}"
     
     document = RestaurantDocument(
@@ -2140,12 +2292,20 @@ async def delete_restaurant_document(document_id: str, current_user: dict = Depe
 # Include the router in the main app
 app.include_router(api_router)
 
+# CORS: require explicit origins when using credentials
+_cors_origins_raw = os.environ.get('CORS_ORIGINS', '')
+if not _cors_origins_raw or _cors_origins_raw.strip() == '*':
+    logger.warning("CORS_ORIGINS not set or set to '*'. Set CORS_ORIGINS to your frontend URL (e.g. 'http://localhost:3000'). Defaulting to localhost.")
+    _cors_origins = ["http://localhost:3000"]
+else:
+    _cors_origins = [origin.strip() for origin in _cors_origins_raw.split(',') if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Configure logging

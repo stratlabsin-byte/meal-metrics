@@ -33,8 +33,10 @@ import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { FileText, Plus, Trash2, Download, Calendar, AlertCircle, Building2, Edit } from "lucide-react";
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const RestaurantDocuments = ({ restaurants }) => {
+  const { labels, config } = useBusinessConfig();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -221,16 +223,16 @@ const RestaurantDocuments = ({ restaurants }) => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Restaurant Documents</h2>
+          <h2 className="text-3xl font-bold tracking-tight">{`${labels.entity} Documents`}</h2>
           <p className="text-muted-foreground">Manage licenses, permits, and other documents</p>
         </div>
         <div className="flex items-center gap-4">
           <Select value={filterRestaurant} onValueChange={setFilterRestaurant}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Restaurants" />
+              <SelectValue placeholder={`All ${labels.entities}`} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Restaurants</SelectItem>
+              <SelectItem value="all">{`All ${labels.entities}`}</SelectItem>
               {restaurants.map((restaurant) => (
                 <SelectItem key={restaurant.id} value={restaurant.id}>
                   {restaurant.name}
@@ -370,7 +372,7 @@ const RestaurantDocuments = ({ restaurants }) => {
           <DialogHeader>
             <DialogTitle>Upload Document</DialogTitle>
             <DialogDescription>
-              Upload a document for your restaurant
+              {`Upload a document for your ${labels.entity.toLowerCase()}`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -382,7 +384,7 @@ const RestaurantDocuments = ({ restaurants }) => {
                 required
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select restaurant" />
+                  <SelectValue placeholder={`Select ${labels.entity.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {restaurants.map((restaurant) => (

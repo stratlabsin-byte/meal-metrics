@@ -33,8 +33,10 @@ import { toast } from "sonner";
 import { Users, Plus, Edit, Trash2, Shield, UserCog } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const UserManager = ({ currentUser }) => {
+  const { labels } = useBusinessConfig();
   const [users, setUsers] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,9 +67,9 @@ const UserManager = ({ currentUser }) => {
   // Available sections/permissions
   const availableSections = [
     { id: "dashboard", label: "Dashboard" },
-    { id: "restaurants", label: "Restaurant Management" },
-    { id: "revenue", label: "Revenue Management" },
-    { id: "revenue_categories", label: "Revenue Categories" },
+    { id: "restaurants", label: `${labels.entity} Management` },
+    { id: "revenue", label: `${labels.revenue} Management` },
+    { id: "revenue_categories", label: `${labels.revenue} Categories` },
     { id: "employees", label: "Employee Management" },
     { id: "documents", label: "Document Management" },
     { id: "brands", label: "Brand Management" },
@@ -332,7 +334,7 @@ const UserManager = ({ currentUser }) => {
                 </div>
                 {user.role === 'manager' && (
                   <div className="pt-2 border-t mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Assigned Restaurants:</p>
+                    <p className="text-xs text-gray-500 mb-1">{`Assigned ${labels.entities}:`}</p>
                     {user.assigned_restaurant_ids && user.assigned_restaurant_ids.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {user.assigned_restaurant_ids.map((restId) => {
@@ -345,7 +347,7 @@ const UserManager = ({ currentUser }) => {
                         })}
                       </div>
                     ) : (
-                      <span className="text-xs text-red-500">No restaurants assigned</span>
+                      <span className="text-xs text-red-500">{`No ${labels.entities.toLowerCase()} assigned`}</span>
                     )}
                   </div>
                 )}
@@ -472,7 +474,7 @@ const UserManager = ({ currentUser }) => {
               <p className="text-xs text-gray-500">
                 {formData.role === 'superuser' && '🔸 Superuser requires explicit permission assignment'}
                 {formData.role === 'admin' && '🔸 Admin has full access to all sections by default'}
-                {formData.role === 'manager' && '🔸 Manager has limited access to assigned restaurants'}
+                {formData.role === 'manager' && `🔸 Manager has limited access to assigned ${labels.entities.toLowerCase()}`}
               </p>
               {currentUser.role === 'admin' && (
                 <p className="text-xs text-blue-600 italic">
@@ -595,7 +597,7 @@ const UserManager = ({ currentUser }) => {
 
             {editDialog.user?.role === 'manager' && (
               <div className="space-y-2">
-                <Label>Assign Restaurants *</Label>
+                <Label>{`Assign ${labels.entities} *`}</Label>
                 <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
                   {restaurants.length > 0 ? (
                     restaurants.map((restaurant) => (
@@ -611,11 +613,11 @@ const UserManager = ({ currentUser }) => {
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-gray-500">No restaurants available</p>
+                    <p className="text-xs text-gray-500">{`No ${labels.entities.toLowerCase()} available`}</p>
                   )}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Manager will only see data for selected restaurants
+                  {`Manager will only see data for selected ${labels.entities.toLowerCase()}`}
                 </p>
               </div>
             )}

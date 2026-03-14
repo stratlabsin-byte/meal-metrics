@@ -5,6 +5,7 @@ import axios from "axios";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import { Toaster } from "@/components/ui/sonner";
+import { BusinessConfigProvider } from "./contexts/BusinessConfigContext";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -65,34 +66,36 @@ function App() {
   }
 
   return (
-    <div className="App">
-      <Toaster position="top-right" richColors />
-      <BrowserRouter>
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              user ? (
-                <Navigate to="/dashboard" />
-              ) : (
-                <LoginPage onLogin={handleLogin} />
-              )
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              user ? (
-                <DashboardPage user={user} onLogout={handleLogout} />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <BusinessConfigProvider>
+      <div className="App">
+        <Toaster position="top-right" richColors />
+        <BrowserRouter>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                user ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <LoginPage onLogin={handleLogin} />
+                )
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                user ? (
+                  <DashboardPage user={user} onLogout={handleLogout} />
+                ) : (
+                  <Navigate to="/login" />
+                )
+              }
+            />
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+          </Routes>
+        </BrowserRouter>
+      </div>
+    </BusinessConfigProvider>
   );
 }
 

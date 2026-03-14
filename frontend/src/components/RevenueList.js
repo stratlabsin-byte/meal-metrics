@@ -41,8 +41,10 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const RevenueList = ({ revenues, restaurants, onUpdate }) => {
+  const { labels, config } = useBusinessConfig();
   const [filterRestaurant, setFilterRestaurant] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
   const [dateFilterType, setDateFilterType] = useState("all");
@@ -168,11 +170,11 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
         date: editFormData.date,
         notes: editFormData.notes,
       });
-      toast.success("Revenue entry updated successfully!");
+      toast.success(`${labels.revenue} entry updated successfully!`);
       setEditDialog({ isOpen: false, revenue: null });
       onUpdate();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to update revenue entry");
+      toast.error(error.response?.data?.detail || `Failed to update ${labels.revenue.toLowerCase()} entry`);
     } finally {
       setLoading(false);
     }
@@ -181,11 +183,11 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
   const handleDeleteRevenue = async (revenueId) => {
     try {
       await axiosInstance.delete(`/revenues/${revenueId}`);
-      toast.success("Revenue entry deleted successfully!");
+      toast.success(`${labels.revenue} entry deleted successfully!`);
       setDeleteDialog({ isOpen: false, revenueId: null });
       onUpdate();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to delete revenue entry");
+      toast.error(error.response?.data?.detail || `Failed to delete ${labels.revenue.toLowerCase()} entry`);
     }
   };
 
@@ -195,7 +197,7 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       return;
     }
 
-    let csvContent = "Restaurant,Date,Total Amount,Notes,Category Breakdown\n";
+    let csvContent = `${labels.entity},Date,Total Amount,Notes,Category Breakdown\n`;
     
     filteredRevenues.forEach(revenue => {
       const categoryBreakdown = revenue.amounts 
@@ -237,7 +239,7 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
           <table>
             <thead>
               <tr>
-                <th>Restaurant</th>
+                <th>${labels.entity}</th>
                 <th>Date</th>
                 <th>Total Amount</th>
                 <th>Notes</th>
@@ -291,13 +293,13 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
 
       // Check if a single restaurant is selected
       if (filterRestaurant === "all") {
-        toast.error("Please select a specific restaurant to generate PDF statement");
+        toast.error(`Please select a specific ${labels.entity.toLowerCase()} to generate PDF statement`);
         return;
       }
 
       const selectedRestaurant = restaurants.find(r => r.id === filterRestaurant);
       if (!selectedRestaurant) {
-        toast.error("Restaurant not found");
+        toast.error(`${labels.entity} not found`);
         return;
       }
 
@@ -320,29 +322,18 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       let yPos = 42;
       
       if (selectedRestaurant.brand) {
-        doc.text(`Brand: ${selectedRestaurant.brand}`, 14, yPos);
+        doc.text(`${labels.brand}: ${selectedRestaurant.brand}`, 14, yPos);
         yPos += 5;
       }
-      
-      if (selectedRestaurant.address) {
-        doc.text(`Address: ${selectedRestaurant.address}`, 14, yPos);
-        yPos += 5;
-      }
-      
-      if (selectedRestaurant.phone) {
-        doc.text(`Phone: ${selectedRestaurant.phone}`, 14, yPos);
-        yPos += 5;
-      }
-      
-      if (selectedRestaurant.gst_number) {
-        doc.text(`GST No: ${selectedRestaurant.gst_number}`, 14, yPos);
-        yPos += 5;
-      }
-      
-      if (selectedRestaurant.msme_number) {
-        doc.text(`MSME No: ${selectedRestaurant.msme_number}`, 14, yPos);
-        yPos += 5;
-      }
+
+      const customFields = (config.custom_fields || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+      customFields.forEach(field => {
+        const value = selectedRestaurant[field.field_key];
+        if (value) {
+          doc.text(`${field.label}: ${value}`, 14, yPos);
+          yPos += 5;
+        }
+      });
       
       yPos += 5;
       doc.setFontSize(9);
@@ -461,13 +452,13 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       <div className="space-y-4">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
-            <Label>Filter by Brand</Label>
+            <Label>Filter by {labels.brand}</Label>
             <Select value={filterBrand} onValueChange={setFilterBrand}>
               <SelectTrigger data-testid="filter-brand-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
+                <SelectItem value="all">{`All ${labels.brand}s`}</SelectItem>
                 {getUniqueBrands().map((brand) => (
                   <SelectItem key={brand} value={brand}>
                     {brand}
@@ -478,13 +469,13 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Filter by Restaurant</Label>
+            <Label>Filter by {labels.entity}</Label>
             <Select value={filterRestaurant} onValueChange={setFilterRestaurant}>
               <SelectTrigger data-testid="filter-restaurant-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Restaurants</SelectItem>
+                <SelectItem value="all">{`All ${labels.entities}`}</SelectItem>
                 {restaurants.map((restaurant) => (
                   <SelectItem key={restaurant.id} value={restaurant.id}>
                     {restaurant.name}
@@ -589,7 +580,7 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-green-50 border border-blue-200">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Total Revenue (Filtered)</p>
+            <p className="text-sm text-gray-600 mb-1">Total {labels.revenue} (Filtered)</p>
             <p className="text-3xl font-bold text-gray-900" data-testid="filtered-total-revenue">
               <CurrencyDisplay amount={totalAmount} />
             </p>
@@ -604,7 +595,7 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       <div className="space-y-3">
         {filteredRevenues.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            No revenue entries found.
+            No {labels.revenue.toLowerCase()} entries found.
           </div>
         ) : (
           filteredRevenues.map((revenue) => (
@@ -633,7 +624,7 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
                   )}
                   {revenue.amounts && Object.keys(revenue.amounts).length > 0 && (
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs font-medium text-gray-700 mb-2">Revenue Breakdown:</p>
+                      <p className="text-xs font-medium text-gray-700 mb-2">{labels.revenue} Breakdown:</p>
                       <div className="space-y-1 text-xs">
                         {Object.entries(revenue.amounts).map(([categoryId, amount]) => (
                           <div key={categoryId} className="flex justify-between">
@@ -697,21 +688,21 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       <Dialog open={editDialog.isOpen} onOpenChange={(open) => setEditDialog({ isOpen: open, revenue: null })}>
         <DialogContent className="max-w-md" data-testid="edit-revenue-dialog">
           <DialogHeader>
-            <DialogTitle>Edit Revenue Entry</DialogTitle>
+            <DialogTitle>Edit {labels.revenue} Entry</DialogTitle>
             <DialogDescription>
-              Update the revenue entry details below.
+              Update the {labels.revenue.toLowerCase()} entry details below.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-restaurant">Restaurant *</Label>
+              <Label htmlFor="edit-restaurant">{labels.entity} *</Label>
               <Select
                 value={editFormData.restaurant_id}
                 onValueChange={(value) => setEditFormData({ ...editFormData, restaurant_id: value })}
               >
                 <SelectTrigger data-testid="edit-restaurant-select">
-                  <SelectValue placeholder="Select a restaurant" />
+                  <SelectValue placeholder={`Select a ${labels.entity.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent>
                   {restaurants.map((restaurant) => (
@@ -724,7 +715,7 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-base font-semibold">Revenue by Category</Label>
+              <Label className="text-base font-semibold">{labels.revenue} by Category</Label>
               <div className="space-y-3 max-h-60 overflow-y-auto">
                 {Object.entries(editFormData.amounts).map(([categoryId, amount]) => (
                   <div key={categoryId} className="space-y-1">
@@ -798,9 +789,9 @@ const RevenueList = ({ revenues, restaurants, onUpdate }) => {
       <AlertDialog open={deleteDialog.isOpen} onOpenChange={(open) => setDeleteDialog({ isOpen: open, revenueId: null })}>
         <AlertDialogContent data-testid="delete-revenue-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Revenue Entry</AlertDialogTitle>
+            <AlertDialogTitle>Delete {labels.revenue} Entry</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this revenue entry? This action cannot be undone.
+              Are you sure you want to delete this {labels.revenue.toLowerCase()} entry? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -43,10 +43,12 @@ import { CurrencyDisplay } from "./CurrencySettings";
 import DataDetailPopup from "./DataDetailPopup";
 import { toast } from "sonner";
 import { formatDateDDMonYYYY } from "../utils/dateFormat";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
 const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI }) => {
+  const { labels } = useBusinessConfig();
   const [open, setOpen] = useState(false);
   const [kpiConfig, setKpiConfig] = useState({
     name: "",
@@ -211,7 +213,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
     
     if (kpi.chartType === 'table' && uniqueGroupings.length > 1) {
       // For multi-dimensional table - create headers based on actual groupings
-      const headers = [...uniqueGroupings.map(g => g.charAt(0).toUpperCase() + g.slice(1)), 'Revenue', 'Count'];
+      const headers = [...uniqueGroupings.map(g => g.charAt(0).toUpperCase() + g.slice(1)), labels.revenue, 'Count'];
       csvContent += headers.join(',') + '\n';
       
       // Export each row with all dimension values
@@ -234,7 +236,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
       csvContent += totalRow.join(',') + '\n';
     } else {
       // For simple charts or single grouping tables
-      csvContent += `Name,Revenue,Count\n`;
+      csvContent += `Name,${labels.revenue},Count\n`;
       data.forEach(item => {
         const name = item.name || item[uniqueGroupings[0]] || 'N/A';
         csvContent += `"${name}",${item.value || 0},${item.count || 0}\n`;
@@ -360,7 +362,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
       
       groupings.forEach(groupType => {
         if (groupType === "restaurant") {
-          const restaurantName = rev.restaurant_name || "Unknown Restaurant";
+          const restaurantName = rev.restaurant_name || `Unknown ${labels.entity}`;
           baseKeyParts.push(restaurantName);
           baseDataParts.restaurant = restaurantName;
         }
@@ -481,13 +483,13 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
                   borderRadius: "8px",
                   fontSize: "12px",
                 }}
-                formatter={(value) => [<CurrencyDisplay amount={value} />, "Revenue"]}
+                formatter={(value) => [<CurrencyDisplay amount={value} />, labels.revenue]}
               />
               <Legend wrapperStyle={{ fontSize: "12px" }} />
               <Bar 
                 dataKey="value" 
                 fill={kpiConfig.color || "#3B82F6"} 
-                name="Revenue" 
+                name={labels.revenue} 
                 radius={[8, 8, 0, 0]} 
                 onClick={(data) => showDataDetail(data, "chart")}
                 style={{ cursor: "pointer" }}
@@ -509,7 +511,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
                   border: "1px solid #e5e7eb",
                   borderRadius: "8px",
                 }}
-                formatter={(value) => [<CurrencyDisplay amount={value} />, "Revenue"]}
+                formatter={(value) => [<CurrencyDisplay amount={value} />, labels.revenue]}
               />
               <Legend />
               <Line
@@ -517,7 +519,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
                 dataKey="value"
                 stroke={kpiConfig.color || "#10B981"}
                 strokeWidth={3}
-                name="Revenue"
+                name={labels.revenue}
                 dot={{ fill: kpiConfig.color || "#10B981", r: 5, cursor: "pointer" }}
                 onClick={(data) => showDataDetail(data, "chart")}
               />
@@ -556,7 +558,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
                   border: "1px solid #e5e7eb",
                   borderRadius: "8px",
                 }}
-                formatter={(value) => [<CurrencyDisplay amount={value} />, "Revenue"]}
+                formatter={(value) => [<CurrencyDisplay amount={value} />, labels.revenue]}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -649,7 +651,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
                     </th>
                   )}
                   <th className="border border-gray-200 px-3 py-2 text-right font-semibold text-gray-700">
-                    Revenue
+                    {labels.revenue}
                   </th>
                   <th className="border border-gray-200 px-3 py-2 text-right font-semibold text-gray-700">
                     Count
@@ -861,7 +863,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="brand">Brand</SelectItem>
-                    <SelectItem value="restaurant">Restaurant</SelectItem>
+                    <SelectItem value="restaurant">{labels.entity}</SelectItem>
                     <SelectItem value="category">Category</SelectItem>
                     <SelectItem value="date">Date</SelectItem>
                     <SelectItem value="month">Month</SelectItem>
@@ -944,7 +946,7 @@ const KPIBuilder = ({ stats, employeeStats, restaurants, revenues, onApplyKPI })
 
               {restaurants.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Select Restaurants (Optional)</Label>
+                  <Label>{`Select ${labels.entities} (Optional)`}</Label>
                   <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg max-h-40 overflow-y-auto">
                     {restaurants.map((restaurant) => (
                       <label key={restaurant.id} className="flex items-center gap-2 cursor-pointer">

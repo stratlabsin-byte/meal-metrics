@@ -42,10 +42,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Copy, Edit, Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
 const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats }) => {
+  const { labels } = useBusinessConfig();
   const [detailPopup, setDetailPopup] = useState({
     isOpen: false,
     data: null,
@@ -58,9 +60,9 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
   const [chartConfigs, setChartConfigs] = useState(() => {
     const saved = localStorage.getItem('chartConfigs');
     return saved ? JSON.parse(saved) : {
-      'bar-chart': { title: 'Revenue by Restaurant', color: '#3B82F6', type: 'bar' },
-      'pie-chart': { title: 'Revenue Distribution', color: '#10B981', type: 'pie' },
-      'line-chart': { title: 'Daily Revenue', color: '#F59E0B', type: 'line' }
+      'bar-chart': { title: `${labels.revenue} by ${labels.entity}`, color: '#3B82F6', type: 'bar' },
+      'pie-chart': { title: `${labels.revenue} Distribution`, color: '#10B981', type: 'pie' },
+      'line-chart': { title: `Daily ${labels.revenue}`, color: '#F59E0B', type: 'line' }
     };
   });
 
@@ -237,9 +239,9 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
   if (!stats) return null;
 
   const getChartLabel = () => {
-    if (groupBy === "month") return "Monthly Revenue";
-    if (groupBy === "restaurant") return "Revenue by Restaurant";
-    return "Daily Revenue";
+    if (groupBy === "month") return `Monthly ${labels.revenue}`;
+    if (groupBy === "restaurant") return `${labels.revenue} by ${labels.entity}`;
+    return `Daily ${labels.revenue}`;
   };
 
   return (
@@ -250,7 +252,7 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
           <Card className="shadow-lg border-0 bg-gradient-to-br from-blue-50 to-blue-100" data-testid="total-revenue-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
-                Total Revenue
+                {`Total ${labels.revenue}`}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
@@ -350,7 +352,7 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
           <Card className="shadow-lg border-0 bg-gradient-to-br from-orange-50 to-orange-100" data-testid="avg-revenue-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
-                Average Revenue
+                {`Average ${labels.revenue}`}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center">
@@ -402,7 +404,7 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
           <Card className="shadow-lg border-0 bg-gradient-to-br from-purple-50 to-purple-100" data-testid="restaurants-count-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
-                Restaurants
+                {labels.entities}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center">
@@ -528,13 +530,13 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
                       border: "1px solid #e5e7eb",
                       borderRadius: "8px",
                     }}
-                    formatter={(value) => [<CurrencyDisplay amount={value} />, "Revenue"]}
+                    formatter={(value) => [<CurrencyDisplay amount={value} />, labels.revenue]}
                   />
                   <Legend />
-                  <Bar 
-                    dataKey="total" 
-                    fill={chartConfigs['bar-chart'].color} 
-                    name="Revenue" 
+                  <Bar
+                    dataKey="total"
+                    fill={chartConfigs['bar-chart'].color}
+                    name={labels.revenue} 
                     radius={[8, 8, 0, 0]} 
                     onClick={(data) => showDataDetail(data, "chart")}
                     style={{ cursor: "pointer" }}
@@ -658,7 +660,7 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
                       border: "1px solid #e5e7eb",
                       borderRadius: "8px",
                     }}
-                    formatter={(value) => [<CurrencyDisplay amount={value} />, "Revenue"]}
+                    formatter={(value) => [<CurrencyDisplay amount={value} />, labels.revenue]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -748,7 +750,7 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
                     border: "1px solid #e5e7eb",
                     borderRadius: "8px",
                   }}
-                  formatter={(value) => [<CurrencyDisplay amount={value} />, "Revenue"]}
+                  formatter={(value) => [<CurrencyDisplay amount={value} />, labels.revenue]}
                 />
                 <Legend />
                 <Line
@@ -756,7 +758,7 @@ const DashboardStats = ({ stats, employeeStats, groupBy = "date", onUpdateStats 
                   dataKey="total"
                   stroke="#10B981"
                   strokeWidth={3}
-                  name="Revenue"
+                  name={labels.revenue}
                   dot={{ fill: "#10B981", r: 5, cursor: "pointer" }}
                   onClick={(data) => showDataDetail(data, "chart")}
                 />

@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { Receipt, Plus, X, Eye, Edit } from "lucide-react";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 
 const DEFAULT_CATEGORIES = [
   "Raw Materials",
@@ -38,6 +39,7 @@ const DEFAULT_CATEGORIES = [
 const PAYMENT_METHODS = ["Cash", "UPI", "Card", "Other"];
 
 const ExpenseEntry = ({ restaurants, user }) => {
+  const { labels } = useBusinessConfig();
   const today = new Date().toISOString().split('T')[0];
   
   const [expenses, setExpenses] = useState([{
@@ -97,7 +99,7 @@ const ExpenseEntry = ({ restaurants, user }) => {
 
   const handleAddBalance = async () => {
     if (!expenses[0].restaurant_id) {
-      toast.error("Please select a restaurant first");
+      toast.error(`Please select a ${labels.entity.toLowerCase()} first`);
       return;
     }
 
@@ -573,7 +575,7 @@ const ExpenseEntry = ({ restaurants, user }) => {
           <DialogHeader>
             <DialogTitle>Add Balance to Opening Amount</DialogTitle>
             <DialogDescription>
-              Add funds to the opening balance for {expenses[0].restaurant_id ? restaurants.find(r => r.id === expenses[0].restaurant_id)?.name : 'selected restaurant'}
+              {`Add funds to the opening balance for ${expenses[0].restaurant_id ? restaurants.find(r => r.id === expenses[0].restaurant_id)?.name : `selected ${labels.entity.toLowerCase()}`}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

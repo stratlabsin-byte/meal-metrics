@@ -14,9 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { axiosInstance } from "../App";
 import { toast } from "sonner";
 import { CurrencyDisplay } from "./CurrencySettings";
+import { useBusinessConfig } from "../contexts/BusinessConfigContext";
 import { Calculator, AlertCircle } from "lucide-react";
 
 const RevenueForm = ({ restaurants, onSuccess }) => {
+  const { labels } = useBusinessConfig();
   const [formData, setFormData] = useState({
     restaurant_id: "",
     amounts: {},
@@ -48,7 +50,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
       });
       setFormData(prev => ({ ...prev, amounts: initialAmounts }));
     } catch (error) {
-      toast.error("Failed to load revenue categories");
+      toast.error(`Failed to load ${labels.revenue.toLowerCase()} categories`);
       console.error("Error loading categories:", error);
     } finally {
       setLoadingCategories(false);
@@ -78,7 +80,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
 
   const validateForm = () => {
     if (!formData.restaurant_id) {
-      toast.error("Please select a restaurant");
+      toast.error(`Please select a ${labels.entity.toLowerCase()}`);
       return false;
     }
 
@@ -97,7 +99,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
     );
 
     if (!hasAnyAmount) {
-      toast.error("Please enter at least one revenue amount");
+      toast.error(`Please enter at least one ${labels.revenue.toLowerCase()} amount`);
       return false;
     }
 
@@ -134,7 +136,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
       });
       onSuccess();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to add revenue entry");
+      toast.error(error.response?.data?.detail || `Failed to add ${labels.revenue.toLowerCase()} entry`);
     } finally {
       setLoading(false);
     }
@@ -143,7 +145,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-6" data-testid="revenue-form">
       <div className="space-y-2">
-        <Label htmlFor="restaurant">Restaurant *</Label>
+        <Label htmlFor="restaurant">{labels.entity} *</Label>
         <Select
           value={formData.restaurant_id}
           onValueChange={(value) =>
@@ -152,7 +154,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
           required
         >
           <SelectTrigger data-testid="restaurant-select">
-            <SelectValue placeholder="Select a restaurant" />
+            <SelectValue placeholder={`Select a ${labels.entity.toLowerCase()}`} />
           </SelectTrigger>
           <SelectContent>
             {restaurants.map((restaurant) => (
@@ -169,7 +171,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
         <div className="flex items-center justify-center p-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading revenue categories...</p>
+            <p className="text-gray-600">{`Loading ${labels.revenue.toLowerCase()} categories...`}</p>
           </div>
         </div>
       )}
@@ -178,8 +180,8 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
       {!formData.restaurant_id && !loadingCategories && (
         <div className="text-center p-8 bg-blue-50 border border-blue-200 rounded-lg">
           <AlertCircle className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-blue-900 mb-2">Select a Restaurant</h3>
-          <p className="text-blue-700">Please select a restaurant to view its revenue categories.</p>
+          <h3 className="text-lg font-semibold text-blue-900 mb-2">{`Select a ${labels.entity}`}</h3>
+          <p className="text-blue-700">{`Please select a ${labels.entity.toLowerCase()} to view its ${labels.revenue.toLowerCase()} categories.`}</p>
         </div>
       )}
 
@@ -187,15 +189,15 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
       {formData.restaurant_id && !loadingCategories && categories.length === 0 && (
         <div className="text-center p-8 bg-orange-50 border border-orange-200 rounded-lg">
           <AlertCircle className="w-12 h-12 text-orange-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-orange-900 mb-2">No Revenue Categories Found</h3>
-          <p className="text-orange-700">This restaurant has no revenue categories assigned. Please ask your administrator to create revenue categories for this restaurant.</p>
+          <h3 className="text-lg font-semibold text-orange-900 mb-2">{`No ${labels.revenue} Categories Found`}</h3>
+          <p className="text-orange-700">{`This ${labels.entity.toLowerCase()} has no ${labels.revenue.toLowerCase()} categories assigned. Please ask your administrator to create ${labels.revenue.toLowerCase()} categories for this ${labels.entity.toLowerCase()}.`}</p>
         </div>
       )}
 
       {/* Revenue Categories */}
       {!loadingCategories && categories.length > 0 && (
         <div className="space-y-4">
-          <Label className="text-base font-semibold">Revenue Categories</Label>
+          <Label className="text-base font-semibold">{labels.revenue} Categories</Label>
           <div className="grid gap-4 md:grid-cols-2">
               {categories.map((category) => (
                 <div key={category.id} className="space-y-2">
@@ -272,7 +274,7 @@ const RevenueForm = ({ restaurants, onSuccess }) => {
           disabled={loading}
           data-testid="submit-revenue-button"
         >
-          {loading ? "Submitting..." : "Submit Revenue Entry"}
+          {loading ? "Submitting..." : `Submit ${labels.revenue} Entry`}
         </Button>
       </>
       )}

@@ -111,7 +111,8 @@ const DashboardPage = ({ user, onLogout }) => {
     fetchData({
       start_date: startDate,
       end_date: endDate,
-      group_by: groupBy
+      group_by: groupBy,
+      brand: selectedBrand
     });
   }, []);
 
@@ -131,9 +132,32 @@ const DashboardPage = ({ user, onLogout }) => {
       ]);
       setRestaurants(restaurantsRes.data);
       setRevenues(revenuesRes.data);
-      setStats(statsRes.data);
       setRevenueCategories(categoriesRes.data);
       setEmployeeStats(employeeStatsRes.data);
+
+      // Apply brand filter client-side (API doesn't support brand param)
+      const brandFilter = filters.brand || "all";
+      let statsData = statsRes.data;
+      if (brandFilter && brandFilter !== "all") {
+        const brandRestaurants = restaurantsRes.data
+          .filter(r => r.brand === brandFilter)
+          .map(r => r.name);
+        const filteredBreakdown = (statsData.restaurant_breakdown || [])
+          .filter(r => brandRestaurants.includes(r.restaurant_name));
+        const filteredDateWise = (statsData.date_wise_revenue || []).map(d => {
+          // If date_wise has per-restaurant data we can filter; otherwise keep as-is
+          return d;
+        });
+        const filteredTotal = filteredBreakdown.reduce((sum, r) => sum + r.total, 0);
+        const filteredEntries = filteredBreakdown.reduce((sum, r) => sum + (r.count || 0), 0);
+        statsData = {
+          ...statsData,
+          total_revenue: filteredTotal,
+          total_entries: filteredEntries || statsData.total_entries,
+          restaurant_breakdown: filteredBreakdown,
+        };
+      }
+      setStats(statsData);
     } catch (error) {
       toast.error("Failed to fetch data");
     } finally {
@@ -142,32 +166,33 @@ const DashboardPage = ({ user, onLogout }) => {
   };
 
   const handleApplyFilters = () => {
-    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy });
+    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy, brand: selectedBrand });
   };
 
   const handleClearFilters = () => {
     setStartDate("");
     setEndDate("");
     setGroupBy("date");
-    fetchData();
+    setSelectedBrand("all");
+    fetchData({});
   };
 
   const handleApplyKPI = (kpiConfig) => {
-    fetchData({ start_date: kpiConfig.startDate, end_date: kpiConfig.endDate, group_by: kpiConfig.groupBy });
+    fetchData({ start_date: kpiConfig.startDate, end_date: kpiConfig.endDate, group_by: kpiConfig.groupBy, brand: selectedBrand });
   };
 
   const handleCurrencyUpdate = (newSettings) => {
     setCurrencySettings(newSettings);
-    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy });
+    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy, brand: selectedBrand });
   };
 
   const handleRevenueAdded = () => {
-    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy });
+    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy, brand: selectedBrand });
     toast.success("Revenue entry added successfully!");
   };
 
   const handleRestaurantUpdated = () => {
-    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy });
+    fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy, brand: selectedBrand });
   };
 
   const handleProfileUpdate = async (e) => {
@@ -236,15 +261,7 @@ const DashboardPage = ({ user, onLogout }) => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h2>
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApplyFilters}
-                  className="gap-1.5 text-sm border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
-                >
-                  <Filter className="w-3.5 h-3.5" />
-                  Filter
-                </Button>
+                {/* Date range */}
                 <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300">
                   <Input
                     type="date"
@@ -262,7 +279,8 @@ const DashboardPage = ({ user, onLogout }) => {
                     data-testid="filter-end-date"
                   />
                 </div>
-                <Select value={groupBy} onValueChange={setGroupBy}>
+                {/* Group by */}
+                <Select value={groupBy} onValueChange={(v) => { setGroupBy(v); }}>
                   <SelectTrigger className="w-auto gap-1.5 text-sm border-gray-200 dark:border-gray-700 rounded-lg h-9 bg-white dark:bg-gray-800">
                     <SelectValue />
                   </SelectTrigger>
@@ -273,7 +291,8 @@ const DashboardPage = ({ user, onLogout }) => {
                     <SelectItem value="brand">{labels.brand}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                {/* Brand filter */}
+                <Select value={selectedBrand} onValueChange={(v) => { setSelectedBrand(v); }}>
                   <SelectTrigger className="w-auto gap-1.5 text-sm border-gray-200 dark:border-gray-700 rounded-lg h-9 bg-white dark:bg-gray-800">
                     <SelectValue placeholder={`All ${labels.brand}s`} />
                   </SelectTrigger>
@@ -284,21 +303,25 @@ const DashboardPage = ({ user, onLogout }) => {
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Apply */}
                 <Button
                   size="sm"
-                  className="bg-violet-600 hover:bg-violet-700 text-white rounded-lg h-9 px-4 text-sm"
+                  className="bg-violet-600 hover:bg-violet-700 text-white rounded-lg h-9 px-5 text-sm font-medium"
                   onClick={handleApplyFilters}
                 >
                   Apply
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 h-9 text-sm"
-                  onClick={handleClearFilters}
-                >
-                  Clear
-                </Button>
+                {/* Clear - only show when filters are active */}
+                {(startDate || endDate || groupBy !== "date" || selectedBrand !== "all") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 h-9 text-sm"
+                    onClick={handleClearFilters}
+                  >
+                    Clear
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -349,7 +372,7 @@ const DashboardPage = ({ user, onLogout }) => {
               <RevenueList
                 revenues={revenues}
                 restaurants={restaurants}
-                onUpdate={() => fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy })}
+                onUpdate={() => fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy, brand: selectedBrand })}
               />
             </CardContent>
           </Card>
@@ -382,7 +405,7 @@ const DashboardPage = ({ user, onLogout }) => {
               <RevenueCategoriesManager
                 categories={revenueCategories}
                 restaurants={restaurants}
-                onUpdate={() => fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy })}
+                onUpdate={() => fetchData({ start_date: startDate, end_date: endDate, group_by: groupBy, brand: selectedBrand })}
               />
             </CardContent>
           </Card>

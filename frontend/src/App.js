@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import { Toaster } from "@/components/ui/sonner";
 import { BusinessConfigProvider } from "./contexts/BusinessConfigContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -66,6 +67,7 @@ function App() {
   }
 
   return (
+    <ThemeProvider>
     <BusinessConfigProvider>
       <div className="App">
         <Toaster position="top-right" richColors />
@@ -96,6 +98,7 @@ function App() {
         </BrowserRouter>
       </div>
     </BusinessConfigProvider>
+    </ThemeProvider>
   );
 }
 

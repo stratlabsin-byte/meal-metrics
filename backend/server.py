@@ -111,16 +111,16 @@ async def create_default_superadmin():
             
             await db.users.insert_one(default_superadmin)
             print("=" * 60)
-            print("🎉 DEFAULT SUPER ADMIN CREATED!")
+            print("DEFAULT SUPER ADMIN CREATED!")
             print("=" * 60)
             print("Username: suadmin")
             print("Password: suadmin")
             print("Role: Superuser")
             print("=" * 60)
-            print("⚠️  IMPORTANT: Please change the password after first login!")
+            print("IMPORTANT: Please change the password after first login!")
             print("=" * 60)
         else:
-            print(f"✓ Database already has {user_count} user(s). Skipping default admin creation.")
+            print(f"[OK] Database already has {user_count} user(s). Skipping default admin creation.")
 
         # Ensure business config exists
         config_count = await db.business_config.count_documents({})
@@ -130,7 +130,7 @@ async def create_default_superadmin():
             config_doc['created_at'] = config_doc['created_at'].isoformat()
             config_doc['updated_at'] = config_doc['updated_at'].isoformat()
             await db.business_config.insert_one(config_doc)
-            print("✓ Default business configuration created.")
+            print("[OK] Default business configuration created.")
 
         # Migrate existing restaurants: copy legacy fields into custom_fields
         restaurants_to_migrate = await db.restaurants.find(
@@ -146,10 +146,10 @@ async def create_default_superadmin():
                     {"_id": restaurant["_id"]},
                     {"$set": {"custom_fields": custom_fields}}
                 )
-            print(f"✓ Migrated {len(restaurants_to_migrate)} restaurants to custom_fields format.")
+            print(f"[OK] Migrated {len(restaurants_to_migrate)} restaurants to custom_fields format.")
 
     except Exception as e:
-        print(f"❌ Error in startup: {e}")
+        print(f"[ERROR] Error in startup: {e}")
 
 # Helper functions
 MIN_PASSWORD_LENGTH = 8
@@ -1733,7 +1733,7 @@ async def get_revenues(current_user: dict = Depends(get_current_user), restauran
     revenues = await db.revenues.find(query, {"_id": 0}).to_list(1000)
     
     for revenue in revenues:
-        if isinstance(revenue['submitted_at'], str):
+        if 'submitted_at' in revenue and isinstance(revenue['submitted_at'], str):
             revenue['submitted_at'] = datetime.fromisoformat(revenue['submitted_at'])
     
     return revenues

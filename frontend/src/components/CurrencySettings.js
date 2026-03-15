@@ -176,9 +176,9 @@ const CurrencySettings = ({ onUpdate }) => {
 };
 
 // Currency formatter component
-export const CurrencyDisplay = ({ amount, className = "", settings = null }) => {
+export const CurrencyDisplay = ({ amount, className = "", settings = null, compact = false }) => {
   const currencySettings = settings || JSON.parse(localStorage.getItem("currencySettings") || '{"icon": "₹", "size": "text-base", "position": "before", "customText": ""}');
-  
+
   const getIcon = () => {
     if (currencySettings.icon === "custom") {
       return currencySettings.customText || "₹";
@@ -186,9 +186,20 @@ export const CurrencyDisplay = ({ amount, className = "", settings = null }) => 
     return currencySettings.icon;
   };
 
-  const formattedAmount = typeof amount === 'number' 
-    ? amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : amount;
+  const formatCompact = (num) => {
+    if (typeof num !== 'number') return num;
+    const abs = Math.abs(num);
+    if (abs >= 10000000) return `${(num / 10000000).toFixed(1)}Cr`;
+    if (abs >= 100000) return `${(num / 100000).toFixed(1)}L`;
+    if (abs >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toFixed(0);
+  };
+
+  const formattedAmount = compact
+    ? formatCompact(typeof amount === 'number' ? amount : parseFloat(amount) || 0)
+    : typeof amount === 'number'
+      ? amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : amount;
 
   if (currencySettings.position === "after") {
     return (

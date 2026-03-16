@@ -59,8 +59,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours (reduced from 7 days)
 # Create the main app without a prefix
 app = FastAPI()
 
-@app.get("/")
-async def root():
+@app.get("/health")
+async def health():
     return {"status": "ok", "service": "MealMetrics API", "docs": "/docs"}
 
 # Mount static files for uploads
@@ -2318,6 +2318,35 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Serve React frontend build (for single-service deployment)
+FRONTEND_BUILD = Path(__file__).parent.parent / "frontend" / "build"
+if FRONTEND_BUILD.exists():
+    from starlette.responses import FileResponse
+
+    # Serve static assets (js, css, images)
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_BUILD / "static")), name="frontend-static")
+
+    # Serve other root-level build files (manifest, icons, etc.)
+    @app.get("/manifest.json")
+    @app.get("/favicon.ico")
+    @app.get("/logo192.png")
+    @app.get("/logo512.png")
+    @app.get("/robots.txt")
+    async def serve_root_files():
+        # Extract the path from the request
+        pass
+
+    # Catch-all: serve index.html for any non-API route (SPA routing)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Don't serve frontend for API routes or upload routes
+        if full_path.startswith("api/") or full_path.startswith("uploads/"):
+            raise HTTPException(status_code=404)
+        file_path = FRONTEND_BUILD / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(FRONTEND_BUILD / "index.html"))
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

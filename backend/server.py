@@ -59,6 +59,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours (reduced from 7 days)
 # Create the main app without a prefix
 app = FastAPI()
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "MealMetrics API", "docs": "/docs"}
+
 # Mount static files for uploads
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
